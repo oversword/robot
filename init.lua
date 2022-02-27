@@ -9,6 +9,7 @@ local ability_item = "default:skeleton_key"
 
 -- TODO: settings
 local max_push = 1--mesecon.setting("movestone_max_push", 50)
+local step_delay = 0.5
 
 robot = {}
 
@@ -445,7 +446,7 @@ function api.move_robot(node, meta, pos, new_pos)
 
 	local timer = minetest.get_node_timer(new_pos)
 	if not timer:is_started() then
-		timer:start(2)
+		timer:start(step_delay)
 	end
 	-- minetest.sound_play("movestone", { pos = pos, max_hear_distance = 20, gain = 0.5 }, true)
 end
@@ -808,7 +809,7 @@ function api.set_status(pos, meta, status)
 	if status == 'running' then
 		local timer = minetest.get_node_timer(pos)
 		if not timer:is_started() then
-			timer:start(2)
+			timer:start(step_delay)
 		end
 	else
 		local timer = minetest.get_node_timer(pos)
@@ -1110,7 +1111,7 @@ local basic_props = {
 		-- Need to do this so we can keep running after falling
 		local timer = minetest.get_node_timer(pos)
 		if not timer:is_started() then
-			timer:start(2)
+			timer:start(step_delay)
 		end
 	end,
 	after_place_node = function (pos, player, itemstack)
@@ -1132,6 +1133,15 @@ local basic_props = {
 			for i,item in ipairs(ability_table) do
 				if item ~= "" then
 					inv:set_stack('abilities', i, item)
+
+					local ability = api.abilities_item_index[item]
+					if ability.modifier then
+						if not ability.un_modifier then
+							minetest.log("error", "[robot] Ability modifier will not run unless it has an un-modfier method.")
+							return
+						end
+						ability.modifier(pos, player:get_player_name())
+					end
 				end
 			end
 		end
