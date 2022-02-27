@@ -9,7 +9,7 @@ local ability_item = "default:skeleton_key"
 
 -- TODO: settings
 local max_push = 1--mesecon.setting("movestone_max_push", 50)
-local step_delay = 0.5
+local step_delay = 2
 
 robot = {}
 
