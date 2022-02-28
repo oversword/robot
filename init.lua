@@ -1,11 +1,17 @@
 
 local S = minetest.get_translator("robot")
 
-local fuel_item = "default:coal_lump"
+local fuel_item = 'default:coal_lump'
 if minetest.get_modpath('tubelib_addons1') then
 	fuel_item = 'tubelib_addons1:biofuel'
 end
-local ability_item = "default:skeleton_key"
+
+local ability_item = 'default:skeleton_key'
+
+local repair_item = 'default:mese_crystal'
+if minetest.get_modpath('tubelib') then
+	repair_item = 'tubelib:repairkit'
+end
 
 -- TODO: settings
 local max_push = 1--mesecon.setting("movestone_max_push", 50)
@@ -106,7 +112,7 @@ local move_ability_item
 if minetest.get_modpath('carts') then
 	move_ability_item = "carts:cart"
 end
-if move_ability_item and minetest.get_modpath('mesecons_mvps') then
+if move_ability_item then
 	robot.add_ability({
 		ability = "move",
 		item = move_ability_item,
@@ -118,28 +124,27 @@ if move_ability_item and minetest.get_modpath('mesecons_mvps') then
 			local frontpos = vector.add(pos, direction)
 
 			local meta = minetest.get_meta(pos)
-			local owner = meta:get_string("player_name")
 
-			-- TODO: remove dependency on mesecon if push is disabled
-			local mp = 0
-			if api.abilities_ability_index.push then
-				local inv = meta:get_inventory()
-				if inv:contains_item('abilities', api.abilities_ability_index.push.item) then
-					mp = max_push
-				end
-			end
-			-- ### Step 1: Push nodes in front ###
-			local success, stack, oldstack = mesecon.mvps_push(frontpos, direction, mp, owner)
-			if not success then
-				if stack == "protected" then
-					error("protected area in the way", 2)
+			local owner = meta:get_string('player_name')
+			if api.has_ability(meta, nil, 'push') then
+				-- ### Step 1: Push nodes in front ###
+				local success, stack, oldstack = mesecon.mvps_push(frontpos, direction, max_push, owner)
+				if not success then
+					if stack == "protected" then
+						error("protected area in the way", 2)
+						return
+					end
+					error("blocked", 2)
 					return
 				end
+				mesecon.mvps_move_objects(frontpos, direction, oldstack)
+			elseif minetest.is_protected(frontpos, owner) then
+				error("protected area in the way", 2)
+				return
+			elseif not api.can_move_to(frontpos) then
 				error("blocked", 2)
-				-- minetest.get_node_timer(pos):start(timer_interval)
 				return
 			end
-			mesecon.mvps_move_objects(frontpos, direction, oldstack)
 
 			-- ### Step 2: Move the movestone ###
 			api.move_robot(node, meta, pos, frontpos)
@@ -155,11 +160,11 @@ end
 
 local climb_ability_item
 if minetest.get_modpath('mesecons_pistons') then
-	climb_ability_item = "mesecons_pistons:piston_normal_off"
+	climb_ability_item = 'mesecons_pistons:piston_normal_off'
 end
-if climb_ability_item and minetest.get_modpath('mesecons') then
+if climb_ability_item then
 	robot.add_ability({
-		ability = "climb",
+		ability = 'climb',
 		item = climb_ability_item,
 		description = S("Climb up and forwards one block"),
 		action = function (pos)
@@ -169,10 +174,12 @@ if climb_ability_item and minetest.get_modpath('mesecons') then
 			local direction = vector.subtract({x=0,y=0,z=0}, minetest.facedir_to_dir(node.param2))
 			local frontpos = vector.add(pos, direction)
 			local uppos = vector.add(frontpos, {x=0,y=1,z=0})
-			local to_node = minetest.get_node(uppos)
-			local to_node_def  = minetest.registered_nodes[to_node.name]
 
-			if not to_node_def.buildable_to then
+			local owner = meta:get_string('player_name')
+			if minetest.is_protected(uppos, owner) then
+				error("protected area in the way", 2)
+				return
+			elseif not api.can_move_to(uppos) then
 				error("blocked", 2)
 				return
 			end
@@ -183,6 +190,7 @@ if climb_ability_item and minetest.get_modpath('mesecons') then
 				error("no support", 2)
 				return
 			end
+
 			-- TODO: ray trace to make sure the hitbox isn't blocking?
 			api.move_robot(node, meta, pos, uppos)
 
@@ -194,7 +202,7 @@ end
 
 local look_ability_item
 if minetest.get_modpath('mesecons_detector') then
-	look_ability_item = "mesecons_detector:node_detector_off"
+	look_ability_item = 'mesecons_detector:node_detector_off'
 elseif minetest.get_modpath('binoculars') then
 	look_ability_item = "binoculars:binoculars"
 end
@@ -221,8 +229,8 @@ end
 
 if minetest.get_modpath('dispenser') then
 	robot.add_ability({
-		ability = "place",
-		item = "dispenser:dispenser",
+		ability = 'place',
+		item = 'dispenser:dispenser',
 		description = S("Place a block down"),
 		command_example = "robot.place(<dir 'up'|'front'/nil|'down'>)",
 		action = function (pos, dir)
@@ -255,9 +263,14 @@ if minetest.get_modpath('dispenser') then
 				end
 				direction = {x=0,y=0,z=0}
 			end
+			local owner = meta:get_string('player_name')
 			local frontpos = vector.add(pos, direction)
+			if minetest.is_protected(frontpos, owner) then
+				error("protected area in the way", 2)
+				return
+			end
 
-			local list = inv:get_list('storage')
+			local list = inv:get_list('main')
 			local next_stack
 			local next_index
 			for index,stack in ipairs(list) do
@@ -286,22 +299,24 @@ if minetest.get_modpath('dispenser') then
 			}
 
 			local new_pos
+			local fuel_used
 			if dir == 'down' then
 				local uppos = vector.add(pos, {x=0,y=1,z=0})
-				local to_node = minetest.get_node(uppos)
-				local to_node_def  = minetest.registered_nodes[to_node.name]
-				if not to_node_def.buildable_to then
+				if minetest.is_protected(uppos, owner) then
+					error("protected area in the way", 2)
+					return
+				elseif not api.can_move_to(uppos) then
 					error("blocked", 2)
 					return
 				end
-				api.move_robot(node, meta, pos, uppos)
-				player_opts.meta = minetest.get_meta(uppos)
+				player_opts.meta = api.move_robot(node, meta, pos, uppos)
 				player_opts.pos = uppos
 				player_opts.dir = {x=0,y=-1,z=0}
 				inv = player_opts.meta:get_inventory()
-				next_stack = inv:get_stack('storage', next_index)
+				next_stack = inv:get_stack('main', next_index)
 
 				new_pos = uppos
+				fuel_used = 2
 
 			end
 			local player = dispenser.actions.fake_player(next_stack, player_opts)
@@ -317,18 +332,22 @@ if minetest.get_modpath('dispenser') then
 			})
 			minetest.check_for_falling(frontpos)
 			if result then
-				inv:set_stack('storage', next_index, result)
+				inv:set_stack('main', next_index, result)
 			end
-			return new_pos
+			return new_pos, fuel_used
 		end
 	})
 end
 
 
-if minetest.get_modpath('bones') and minetest.get_modpath('dispenser') then
+local use_ability_item
+if minetest.get_modpath('bones') then
+	use_ability_item = "bones:bones"
+end
+if use_ability_item and minetest.get_modpath('dispenser') then
 	robot.add_ability({
 		ability = "use",
-		item = "bones:bones",
+		item = use_ability_item,
 		description = S("Use an item (not a tool)"),
 		action = function (pos)
 			local node = minetest.get_node(pos)
@@ -338,7 +357,7 @@ if minetest.get_modpath('bones') and minetest.get_modpath('dispenser') then
 
 			local meta = minetest.get_meta(pos)
 			local inv = meta:get_inventory()
-			local list = inv:get_list('storage')
+			local list = inv:get_list('main')
 			local next_stack
 			local next_index
 			for index,stack in ipairs(list) do
@@ -376,17 +395,21 @@ if minetest.get_modpath('bones') and minetest.get_modpath('dispenser') then
 				above=vector.add(frontpos, {x=0,y=1,z=0})
 			})
 			if result then
-				inv:set_stack('storage', next_index, result)
+				inv:set_stack('main', next_index, result)
 			end
 		end
 	})
 end
 
 
+local push_ability_item
 if minetest.get_modpath('mesecons_movestones') then
+	push_ability_item = "mesecons_movestones:movestone"
+end
+if push_ability_item and minetest.get_modpath('mesecons_mvps') then
 	robot.add_ability({
-		ability = "push",
-		item = "mesecons_movestones:movestone",
+		ability = 'push',
+		item = push_ability_item,
 		description = S("Push a block when moving forwards")
 	})
 end
@@ -408,21 +431,21 @@ if carry_ability_item then
 		modifier = function(pos, player_name)
 			local meta = minetest.get_meta(pos)
 			local inv = meta:get_inventory()
-			inv:set_size('storage', 16)
+			inv:set_size('main', 16)
 		end,
 		un_modifier = function(pos, player_name)
 			local meta = minetest.get_meta(pos)
 			local inv = meta:get_inventory()
 
 			-- Spit out any extra items
-			local list = inv:get_list('storage')
+			local list = inv:get_list('main')
 			for i,stack in ipairs(list) do
 				if i > 1 then
 					minetest.add_item(vector.add(pos, {x=0,y=0.5,z=0}), stack)
 				end
 			end
 
-			inv:set_size('storage', 1)
+			inv:set_size('main', 1)
 		end,
 	})
 end
@@ -442,7 +465,7 @@ if fuel_ability_item then
 		modifier = function(pos, player_name)
 			local meta = minetest.get_meta(pos)
 			local inv = meta:get_inventory()
-			inv:set_size('main', 4)
+			inv:set_size('fuel', 4)
 			api.update_formspec(pos, meta)
 
 			if api.formspec_data[player_name]
@@ -457,14 +480,14 @@ if fuel_ability_item then
 			local inv = meta:get_inventory()
 
 			-- Spit out any extra items
-			local list = inv:get_list('main')
+			local list = inv:get_list('fuel')
 			for i,stack in ipairs(list) do
 				if i > 1 then
 					minetest.add_item(vector.add(pos, {x=0,y=0.5,z=0}), stack)
 				end
 			end
 
-			inv:set_size('main', 1)
+			inv:set_size('fuel', 1)
 			api.update_formspec(pos, meta)
 
 			if api.formspec_data[player_name]
@@ -478,8 +501,22 @@ if fuel_ability_item then
 end
 
 
+local fill_ability_item
+if minetest.get_modpath('tubelib') then
+	fill_ability_item = 'tubelib:tubeS'
+end
+if fill_ability_item and minetest.get_modpath('tubelib') then
+	robot.add_ability({
+		ability = 'fill',
+		item = fill_ability_item,
+		description = S("Fill and empty the inventory using pushers"),
+	})
+end
+
+
 local stop_action = function (pos)
 	api.set_status(pos, minetest.get_meta(pos), 'stopped')
+	return nil, 0
 end
 
 function api.stop_timer(pos)
@@ -488,6 +525,7 @@ function api.stop_timer(pos)
 		timer:stop()
 	end
 end
+
 function api.start_timer(pos)
 	local timer = minetest.get_node_timer(pos)
 	if not timer:is_started() then
@@ -504,12 +542,32 @@ function api.move_robot(node, meta, pos, new_pos)
 	meta2:mark_as_private('memory')
 	minetest.remove_node(pos)
 
-	-- TODO: remove mesecon dependency
-	mesecon.on_dignode(pos, node)
-	mesecon.on_placenode(new_pos, node)
-
 	minetest.after(0.01, api.stop_timer, pos)
 	-- minetest.sound_play("movestone", { pos = pos, max_hear_distance = 20, gain = 0.5 }, true)
+	return meta2
+end
+
+function api.can_move_to(pos)
+	local node = minetest.get_node(pos)
+
+	if minetest.registered_nodes[node.name] then
+		return minetest.registered_nodes[node.name].buildable_to or false
+	end
+
+	return false
+end
+
+function api.has_ability(meta, inv, ability)
+	if not api.abilities_ability_index[ability] then
+		return false
+	end
+	if not inv then
+		inv = meta:get_inventory()
+	end
+	if not inv:contains_item('abilities', api.abilities_ability_index[ability].item) then
+		return false
+	end
+	return true
 end
 
 -------------------------
@@ -780,7 +838,6 @@ local function run_inner(pos, meta)
 					end
 					action_call = {
 						ability = ability.ability,
-						action = ability.action,
 						args = {...}
 					}
 				end
@@ -794,7 +851,6 @@ local function run_inner(pos, meta)
 		end
 		action_call = {
 			ability = "stop",
-			action = stop_action,
 			args = {}
 		}
 	end
@@ -817,34 +873,24 @@ local function run_inner(pos, meta)
 	-- Save memory. This may burn the luacontroller if a memory overflow occurs.
 	save_memory(pos, meta, env.mem)
 
-	local new_pos
 	if action_call then
-		local g, msg2 = pcall(action_call.action, pos, unpack(action_call.args))
-		-- local msg2 = action_call.action(pos, unpack(action_call.args))
-		-- local g = true
-
-		if not g then return false, trans.cant.." "..action_call.ability..": "..msg2 end
-		if msg2 then
-			new_pos = msg2
+		local action_func
+		if action_call.ability == 'stop' then
+			action_func = stop_action
+		else
+			local ability_obj = api.abilities_ability_index[action_call.ability]
+			action_func = ability_obj.action
 		end
-	end
-	return true, warning, new_pos
-end
 
--- Wraps run_inner with LC-reset-on-error
-local function run(pos, meta)
-	local inv = meta:get_inventory()
-	if inv:is_empty('main') then
-		api.set_status(pos, meta, 'stopped')
-		return false, S("Out of fuel")
+		local action_success, new_pos_or_err, fuel_used = pcall(action_func, pos, unpack(action_call.args))
+
+		if not action_success then
+			return false, trans.cant.." "..action_call.ability..": "..new_pos_or_err
+		end
+
+		return true, warning, new_pos_or_err, fuel_used or 1
 	end
-	inv:remove_item('main', fuel_item)
-	local ok, errmsg, new_pos = run_inner(pos, meta)
-	if not ok then
-		-- minetest.log("error",  errmsg)
-		api.set_error(new_pos or pos, meta, errmsg)
-	end
-	return ok, errmsg
+	return true, warning
 end
 
 
@@ -853,7 +899,7 @@ function api.update_formspec(pos, meta)
 	if not meta then meta = minetest.get_meta(pos) end
 	local inv = meta:get_inventory()
 
-	meta:set_string('formspec', api.formspecs.inventory(meta:get_string('status'), inv:get_size('main')))
+	meta:set_string('formspec', api.formspecs.inventory(meta:get_string('status'), inv:get_size('fuel')))
 
 	-- minetest.show_formspec(player_name, 'robot_inventory', meta:get_string('formspec'))
 end
@@ -864,14 +910,18 @@ function api.set_status(pos, meta, status)
 		minetest.swap_node(pos, {name="robot:robot_running",param2=node.param2})
 	elseif status == 'error' and node.name ~= "robot:robot_error" then
 		minetest.swap_node(pos, {name="robot:robot_error",param2=node.param2})
+	elseif status == 'broken' and node.name ~= "robot:robot_broken" then
+		minetest.swap_node(pos, {name="robot:robot_broken",param2=node.param2})
 	elseif status == 'stopped' and node.name ~= "robot:robot" then
 		minetest.swap_node(pos, {name="robot:robot",param2=node.param2})
 	end
+
 	if status == 'running' then
 		api.start_timer(pos)
 	else
 		api.stop_timer(pos)
 	end
+
 	meta:set_string('status', status)
 	api.update_formspec(pos, meta)
 end
@@ -909,9 +959,11 @@ function api.formspecs.inventory(status, fuel_size)
 	if status == 'stopped' then
 		exec_button = minetest.formspec_escape(S("Run"))
 	elseif status == 'error' then
-		exec_button = minetest.formspec_escape(S("ERR"))
+		exec_button = minetest.formspec_escape(S("ERROR"))
 	elseif status == 'running' then
 		exec_button = minetest.formspec_escape(S("Stop"))
+	elseif status == 'broken' then
+		exec_button = minetest.formspec_escape(S("Broken"))
 	end
 
 	local fuel_pos = 2
@@ -924,14 +976,14 @@ function api.formspecs.inventory(status, fuel_size)
 		default.gui_bg_img..
 		default.gui_slots..
 		([[
-			list[context;storage;0,0;8,2;]
+			list[context;main;0,0;8,2;]
 			list[context;abilities;3,3;5,1;]
-			list[context;main;0,%i;2,2;]
+			list[context;fuel;0,%i;2,2;]
 			item_image[0,%i;1,1;%s]
 			item_image_button[2,3;1,1;%s;ability_reference;]
 			tooltip[ability_reference;%s]
 			button[4,2;4,1;program_edit;%s]
-			button[3,2;1,1;status;%s]
+			button[2,2;2,1;status;%s]
 			list[current_player;main;0,4.3;8,4;]
 			listring[context;main]
 			listring[current_player;main]
@@ -974,6 +1026,35 @@ function api.formspecs.ability()
 		entries
 end
 
+function api.formspecs.error(error)
+	return ([[
+		size[12,2]
+		label[0.1,0.3;%s]
+		button[4.75,1;3,1;dismiss_error;%s]
+	]]):format(
+		minetest.formspec_escape(error),
+		minetest.formspec_escape(S("Dismiss error"))
+	)
+end
+
+function api.formspecs.broken()
+	local item_description = repair_item
+	local item_def = minetest.registered_nodes[repair_item] or minetest.registered_items[repair_item]
+	if item_def then
+		item_description = item_def.description
+	end
+	return ([[
+		size[8,2]
+		item_image[0,0;2,2;%s]
+		label[2,0.5;%s]
+		label[2,1;%s]
+	]]):format(
+		repair_item,
+		minetest.formspec_escape(S("The robot is broken")),
+		minetest.formspec_escape(S("Use a").." "..item_description.." "..S("to repair it"))
+	)
+end
+
 api.formspec_data = {}
 
 local function on_receive_fields(pos, form_name, fields, sender)
@@ -1000,10 +1081,17 @@ local function on_receive_fields(pos, form_name, fields, sender)
 		local meta = minetest.get_meta(pos)
 		local status = meta:get_string('status')
 		if status == 'stopped' then
+			meta:set_string('error', '')
 			api.set_status(pos, meta, 'running')
 			minetest.show_formspec(player_name, '', '')
 		elseif status == 'running' then
 			api.set_status(pos, meta, 'stopped')
+		elseif status == 'error' then
+			api.formspec_data[player_name] = api.formspec_data[player_name] or {}
+			api.formspec_data[player_name].pos = pos
+			minetest.show_formspec(player_name, 'robot_error', api.formspecs.error(meta:get_string('error')))
+		elseif status == 'broken' then
+			minetest.show_formspec(player_name, 'robot_broken', api.formspecs.broken())
 		end
 	end
 end
@@ -1015,15 +1103,34 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		on_receive_fields(pos, formname, fields, player)
 		return
 	end
+	if formname == 'robot_error' then
+		local player_name = player:get_player_name()
+		if fields.quit then
+			api.formspec_data[player_name] = nil
+			return
+		end
+		if fields.dismiss_error then
+			local pos = api.formspec_data[player_name].pos
+			local meta = minetest.get_meta(pos)
+			if meta:get_string('status') == 'error' then
+				meta:set_string('error', '')
+				api.set_status(pos, meta, 'stopped')
+			end
+
+			api.formspec_data[player_name].psuedo_metadata = true
+			minetest.show_formspec(player_name, 'robot_inventory', meta:get_string('formspec'))
+		end
+		return
+	end
+
 	if formname ~= 'robot_program' then return end
 
+	local player_name = player:get_player_name()
 	if fields.quit then
-		local player_name = player:get_player_name()
 		api.formspec_data[player_name] = nil
 		return
 	end
 
-	local player_name = player:get_player_name()
 	local pos = api.formspec_data[player_name].pos
 	local meta = minetest.get_meta(pos)
 
@@ -1038,8 +1145,9 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 	elseif fields.code then
 		meta:set_string('code', fields.code)
 		meta:mark_as_private('code')
-		meta:set_string('error', '')
-		api.set_status(pos, meta, 'stopped')
+		if meta:get_string('status') == 'error' then
+			api.set_status(pos, meta, 'stopped')
+		end
 
 		api.formspec_data[player_name].psuedo_metadata = true
 		minetest.show_formspec(player_name, 'robot_inventory', meta:get_string('formspec'))
@@ -1051,12 +1159,12 @@ local function allow_metadata_inventory_put(pos, listname, index, stack, player)
 	if minetest.is_protected(pos, player:get_player_name()) then
 		return 0
 	end
-	if listname == "main" then
+	if listname == 'fuel' then
 		-- Main stack only accepts fuel
 		if stack:get_name() == fuel_item then
 			return stack:get_count()
 		end
-	elseif listname == "abilities" then
+	elseif listname == 'abilities' then
 		-- Ability stack only accepts one of each ability item
 		local item = stack:get_name()
 		if api.abilities_item_index[item] then
@@ -1067,7 +1175,7 @@ local function allow_metadata_inventory_put(pos, listname, index, stack, player)
 			end
 		else
 	end
-	elseif listname == "storage" then
+	elseif listname == 'main' then
 		return stack:get_count()
 	end
 	return 0
@@ -1131,84 +1239,193 @@ local function on_metadata_inventory_move(pos, from_list, from_index, to_list, t
 	on_metadata_inventory_put(pos, to_list, to_index, to_stack, player)
 end
 
-local basic_props = {
-	description = S("Automated Robot"),
-	tiles = {
-		-- up, down, right, left, back, front
-		'robot_top.png',
-		'robot_bottom.png',
-		'robot_side.png',
-		'robot_side.png',
-		'robot_back.png',
-		'robot_front.png',
-	},
-	groups = {falling_node = 1, cracky=2},
-	-- sunlight_propagates = true,
-	buildable_to = false,
-	paramtype2 = "facedir",
-	is_ground_content = false,
+local function after_dig_node(pos, oldnode, oldmeta_table, player)
+	local stack = ItemStack({
+		name = oldnode.name == "robot:robot_broken"
+			and "robot:robot_broken"
+			or "robot:robot",
+		count = 1
+	})
+	local nodedef = stack:get_definition()
+	local stackmeta = stack:get_meta()
 
-	on_construct = function (pos)
-		local meta = minetest.get_meta(pos)
-
-		meta:set_string('status', 'stopped')
-		meta:set_string('code', '')
-		meta:set_string('player_name', '??')
-		meta:set_string('pos', minetest.pos_to_string(pos))
-		meta:set_int('ignore_errors', 0)
-		meta:set_string('memory', minetest.serialize({}))
-
-		meta:mark_as_private("memory")
-		meta:mark_as_private('code')
-
-		local inv = meta:get_inventory()
-		inv:set_size('main', 1)
-		inv:set_size('storage', 1)
-		inv:set_size('abilities', 5)
-
-		api.update_formspec(pos, meta)
-
-		-- Need to do this so we can keep running after falling
-		api.start_timer(pos)
-	end,
-	after_place_node = function (pos, player, itemstack)
-		local stackmeta = itemstack:get_meta()
-		local code = stackmeta:get_string('code')
-		local memory = stackmeta:get_string('memory')
-		local ability_str = stackmeta:get_string('abilities')
-		local ignore_errors = stackmeta:get_int('ignore_errors')
-
-		local meta = minetest.get_meta(pos)
-		meta:set_string('code', code)
-		meta:set_int('ignore_errors', ignore_errors)
-		if memory ~= "" then
-			meta:set_string('memory', minetest.deserialize(memory))
+	stackmeta:set_int('ignore_errors', oldmeta_table.fields.ignore_errors or 0)
+	stackmeta:set_string('code', oldmeta_table.fields.code)
+	stackmeta:set_string('memory', oldmeta_table.fields.memory)
+	local ability_table = {}
+	if oldmeta_table.inventory.abilities then
+		for _,itemstack in ipairs(oldmeta_table.inventory.abilities) do
+			table.insert(ability_table, itemstack:get_name())
 		end
-		if ability_str ~= "" then
-			local ability_table = minetest.deserialize(ability_str)
-			local inv = meta:get_inventory()
-			for i,item in ipairs(ability_table) do
-				if item ~= "" then
-					inv:set_stack('abilities', i, item)
+	end
+	stackmeta:set_string('abilities', minetest.serialize(ability_table))
 
-					local ability = api.abilities_item_index[item]
-					if ability.modifier then
-						if not ability.un_modifier then
-							minetest.log("error", "[robot] Ability modifier will not run unless it has an un-modfier method.")
-							return
-						end
-						ability.modifier(pos, player:get_player_name())
+	-- Drop all items
+	if oldmeta_table.inventory.fuel then
+		for _,itemstack in ipairs(oldmeta_table.inventory.fuel) do
+			minetest.add_item(pos, itemstack)
+		end
+	end
+	if oldmeta_table.inventory.main then
+		for _,itemstack in ipairs(oldmeta_table.inventory.main) do
+			minetest.add_item(pos, itemstack)
+		end
+	end
+
+	if not (player and player:is_player()) then
+		minetest.add_item(pos, stack)
+	else
+		local inv = player:get_inventory()
+		local leftover = inv:add_item('main', stack)
+		if leftover and not leftover:is_empty() then
+			minetest.add_item(pos, leftover)
+		end
+	end
+	return false
+end
+
+local function after_place_node(pos, player, itemstack)
+	local stackmeta = itemstack:get_meta()
+	local code = stackmeta:get_string('code')
+	local memory = stackmeta:get_string('memory')
+	local ability_str = stackmeta:get_string('abilities')
+	local ignore_errors = stackmeta:get_int('ignore_errors')
+
+	local meta = minetest.get_meta(pos)
+	meta:set_string('code', code)
+	meta:set_int('ignore_errors', ignore_errors)
+	if memory ~= "" then
+		meta:set_string('memory', minetest.deserialize(memory))
+	end
+	if ability_str ~= "" then
+		local ability_table = minetest.deserialize(ability_str)
+		local inv = meta:get_inventory()
+		for i,item in ipairs(ability_table) do
+			if item ~= "" then
+				inv:set_stack('abilities', i, item)
+
+				local ability = api.abilities_item_index[item]
+				if ability.modifier then
+					if not ability.un_modifier then
+						minetest.log("error", "[robot] Ability modifier will not run unless it has an un-modfier method.")
+						return
 					end
+					ability.modifier(pos, player:get_player_name())
 				end
 			end
 		end
+	end
 
-		meta:mark_as_private("memory")
-		meta:mark_as_private('code')
+	meta:mark_as_private("memory")
+	meta:mark_as_private('code')
 
-		meta:set_string('player_name', player:get_player_name())
-	end,
+	meta:set_string('player_name', player:get_player_name())
+end
+
+local function on_construct(pos)
+	local meta = minetest.get_meta(pos)
+
+	meta:set_string('status', 'stopped')
+	meta:set_string('code', '')
+	meta:set_string('player_name', '??')
+	meta:set_string('pos', minetest.pos_to_string(pos))
+	meta:set_int('ignore_errors', 0)
+	meta:set_string('memory', minetest.serialize({}))
+
+	meta:mark_as_private("memory")
+	meta:mark_as_private('code')
+
+	local inv = meta:get_inventory()
+	inv:set_size('fuel', 1)
+	inv:set_size('main', 1)
+	inv:set_size('abilities', 5)
+
+	api.update_formspec(pos, meta)
+
+	-- Need to do this so we can keep running after falling
+	api.stop_timer(pos)
+	api.start_timer(pos)
+end
+
+local function on_rightclick(pos, node, clicker, itemstack, pointed_thing)
+	local meta = minetest.get_meta(pos)
+	if meta:get_string('status') == 'running' then
+		api.set_status(pos, meta, 'stopped')
+	end
+end
+
+
+local function on_timer (pos, dtime)
+	local meta = minetest.get_meta(pos)
+
+	if meta:get_string('status') ~= 'running' then
+		return false
+	end
+
+	local old_pos_str = meta:get_string('pos')
+	if old_pos_str ~= "" then
+		local old_pos = minetest.string_to_pos(old_pos_str)
+		local diff = vector.subtract(old_pos, pos)
+		if diff.y > 10 then
+			api.set_status(pos, meta, 'broken')
+			meta:set_string('error', S("Ouch: internal damage"))
+			meta:set_string('pos', minetest.pos_to_string(pos))
+			return false
+		end
+	end
+
+	local inv = meta:get_inventory()
+
+	if inv:is_empty('fuel') then
+		api.set_error(pos, meta, S("Out of fuel"))
+		return false
+	end
+
+	-- If there's no code, stop running but keep the skin
+	-- so builders can use the running face
+	if meta:get_string('code') == "" then
+		inv:remove_item('fuel', fuel_item)
+		return false
+	end
+
+	local ok, errmsg, new_pos, fuel_used = run_inner(pos, meta)
+	if new_pos then
+		meta = minetest.get_meta(new_pos)
+		inv = meta:get_inventory()
+	end
+	if fuel_used and fuel_used > 0 then
+		inv:remove_item('fuel', ItemStack({ name=fuel_item, count=fuel_used }))
+	end
+
+	if not ok then
+		-- minetest.log("error",  errmsg)
+		api.set_error(new_pos or pos, meta, errmsg)
+		return false
+	end
+
+	if errmsg ~= "" then
+		meta:set_string('error', errmsg)
+	end
+
+	return true
+end
+
+local basic_props = {
+	description = S("Automated Robot"),
+	groups = {falling_node = 1, cracky=2},
+
+	buildable_to = false,
+	paramtype2 = "facedir",
+	is_ground_content = false,
+	stack_max = 1,
+	drop = '',
+
+	on_construct = on_construct,
+	after_place_node = after_place_node,
 	on_receive_fields = on_receive_fields,
+
+	on_rightclick = on_rightclick,
+	after_dig_node = after_dig_node,
 
 	allow_metadata_inventory_put = allow_metadata_inventory_put,
 	allow_metadata_inventory_take = allow_metadata_inventory_take,
@@ -1216,72 +1433,6 @@ local basic_props = {
 	on_metadata_inventory_put = on_metadata_inventory_put,
 	on_metadata_inventory_take = on_metadata_inventory_take,
 	on_metadata_inventory_move = on_metadata_inventory_move,
-	on_timer = function (pos, dtime)
-		local meta = minetest.get_meta(pos)
-		local old_pos_str = meta:get_string('pos')
-		if old_pos_str ~= "" then
-			local old_pos = minetest.string_to_pos(old_pos_str)
-			local diff = vector.subtract(old_pos, pos)
-			if diff.y > 10 then
-				api.set_status(pos, meta, 'error')
-				meta:set_string('error', 'Ouch: internal damage')
-				meta:set_string('pos', minetest.pos_to_string(pos))
-				return false
-			end
-		end
-		if meta:get_string('status') ~= 'running' then
-			return false
-		end
-		local success = run(pos, meta)
-		return success
-	end,
-	on_rightclick = function(pos, node, clicker, itemstack, pointed_thing)
-		local meta = minetest.get_meta(pos)
-		if meta:get_string('status') == 'running' then
-			api.set_status(pos, meta, 'stopped')
-		end
-	end,
-	stack_max = 1,
-	drop = '',
-	after_dig_node = function (pos, oldnode, oldmeta_table, player)
-		local stack = ItemStack({name = "robot:robot", count=1, wear=0})
-		local nodedef = stack:get_definition()
-		local stackmeta = stack:get_meta()
-
-		stackmeta:set_int('ignore_errors', oldmeta_table.fields.ignore_errors or 0)
-		stackmeta:set_string('code', oldmeta_table.fields.code)
-		stackmeta:set_string('memory', oldmeta_table.fields.memory)
-		local ability_table = {}
-		if oldmeta_table.inventory.abilities then
-			for _,itemstack in ipairs(oldmeta_table.inventory.abilities) do
-				table.insert(ability_table, itemstack:get_name())
-			end
-		end
-		stackmeta:set_string('abilities', minetest.serialize(ability_table))
-
-		-- Drop all items
-		if oldmeta_table.inventory.main then
-			for _,itemstack in ipairs(oldmeta_table.inventory.main) do
-				minetest.add_item(pos, itemstack)
-			end
-		end
-		if oldmeta_table.inventory.storage then
-			for _,itemstack in ipairs(oldmeta_table.inventory.storage) do
-				minetest.add_item(pos, itemstack)
-			end
-		end
-
-		if not (player and player:is_player()) then
-			minetest.add_item(pos, stack)
-		else
-			local inv = player:get_inventory()
-			local leftover = inv:add_item("main", stack)
-			if leftover and not leftover:is_empty() then
-				minetest.item_drop(leftover, player, player:get_pos())
-			end
-		end
-		return false
-	end
 }
 
 if minetest.get_modpath('screwdriver') then
@@ -1289,6 +1440,15 @@ if minetest.get_modpath('screwdriver') then
 end
 
 local stopped_props = table.copy(basic_props)
+stopped_props.tiles = {
+	-- up, down, right, left, back, front
+	'robot_top.png',
+	'robot_bottom.png',
+	'robot_side.png',
+	'robot_side.png',
+	'robot_back.png',
+	'robot_front.png',
+}
 minetest.register_node("robot:robot", stopped_props)
 
 
@@ -1319,6 +1479,7 @@ running_props.tiles = {
 	'robot_front_running.png',
 }
 running_props.groups.not_in_creative_inventory = 1
+running_props.on_timer = on_timer
 minetest.register_node("robot:robot_running", running_props)
 
 
@@ -1351,25 +1512,86 @@ error_props.tiles = {
 error_props.groups.not_in_creative_inventory = 1
 minetest.register_node("robot:robot_error", error_props)
 
+
+local broken_props = table.copy(basic_props)
+broken_props.tiles = {
+	-- up, down, right, left, back, front
+	'robot_top.png',
+	'robot_bottom.png',
+	'robot_side_broken.png',
+	'robot_side_broken.png',
+	'robot_back_error.png',
+	'robot_front_broken.png',
+}
+broken_props.groups.not_in_creative_inventory = 1
+broken_props.description = S("Broken Automated Robot")
+if repair_item ~= 'tubelib:repairkit' then
+	broken_props.on_punch = function (pos, node, puncher, pointed_thing)
+		if not (puncher and puncher:is_player()) then return end
+
+		if node.name ~= "robot:robot_broken" then return end
+
+		local item = puncher:get_wielded_item()
+		if item:is_empty() then return end
+		if item:get_name() ~= repair_item then return end
+
+		local taken = item:take_item(1)
+		if taken:is_empty() then return end
+
+		local meta = minetest.get_meta(pos)
+		meta:set_string('error', '')
+		api.set_status(pos, meta, 'stopped')
+
+		return puncher:set_wielded_item(item)
+	end
+end
+broken_props.after_place_node = function(pos, player, itemstack)
+	local meta = minetest.get_meta(pos)
+	meta:set_string('status', 'broken')
+	return after_place_node(pos, player, itemstack)
+end
+minetest.register_node("robot:robot_broken", broken_props)
+
 if minetest.global_exists('tubelib') then
-	tubelib.register_node("robot:robot", {"robot:robot","robot:robot_error","robot:robot_running"}, {
+	local tubelib_options = {
 		on_pull_item = function(pos, side, player_name)
+			local meta = minetest.get_meta(pos)
+			if api.has_ability(meta, nil, 'fill') then
+				return tubelib.get_item(meta, 'main')
+			end
+			return
 		end,
 		on_push_item = function(pos, side, item, player_name)
-			local inv = minetest.get_meta(pos):get_inventory()
-			if inv:room_for_item("main", item) and item:get_name() == fuel_item then
-				inv:add_item("main", item)
-				return true
+			local meta = minetest.get_meta(pos)
+			local inv = meta:get_inventory()
+			if item:get_name() == fuel_item then
+				return tubelib.put_item(meta, 'fuel', item)
+			elseif api.has_ability(meta, inv, 'fill') then
+				return tubelib.put_item(meta, 'main', item)
 			end
 			return false
 		end,
 		on_unpull_item = function(pos, side, item, player_name)
-			local inv = minetest.get_meta(pos):get_inventory()
-			if inv:room_for_item("main", item) and item:get_name() == fuel_item then
-				inv:add_item("main", item)
-				return true
+			local meta = minetest.get_meta(pos)
+			local inv = meta:get_inventory()
+			if api.has_ability(meta, inv, 'fill') then
+				return tubelib.put_item(meta, 'main', item)
 			end
 			return false
 		end,
-	})
+	}
+	if repair_item == 'tubelib:repairkit' then
+		tubelib_options.on_node_repair = function(pos)
+			local meta = minetest.get_meta(pos)
+			if meta:get_string('status') ~= 'broken' then return end
+			meta:set_string('error', '')
+			api.set_status(pos, meta, 'stopped')
+			return true
+		end
+	end
+	tubelib.register_node(
+		"robot:robot",
+		{"robot:robot","robot:robot_error","robot:robot_broken","robot:robot_running"},
+		tubelib_options
+	)
 end
