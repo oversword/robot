@@ -173,6 +173,6 @@ end
 broken_props.after_place_node = function(pos, player, itemstack)
 	local meta = minetest.get_meta(pos)
 	meta:set_string('status', 'broken')
-	return after_place_node(pos, player, itemstack)
+	return api.after_place_node(pos, player, itemstack)
 end
 minetest.register_node("robot:robot_broken", broken_props)

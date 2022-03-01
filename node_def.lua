@@ -19,8 +19,7 @@ local function allow_metadata_inventory_put(pos, listname, index, stack, player)
 			if not inv:contains_item(listname, item) then
 				return 1
 			end
-		else
-	end
+		end
 	elseif listname == 'main' then
 		return stack:get_count()
 	end
@@ -144,7 +143,7 @@ local function after_dig_node(pos, oldnode, oldmeta_table, player)
 	return false
 end
 
-local function after_place_node(pos, player, itemstack)
+function api.after_place_node(pos, player, itemstack)
 	local stackmeta = itemstack:get_meta()
 	local code = stackmeta:get_string('code')
 	local memory = stackmeta:get_string('memory')
@@ -158,6 +157,7 @@ local function after_place_node(pos, player, itemstack)
 		meta:set_string('memory', minetest.deserialize(memory))
 	end
 	if ability_str ~= "" then
+		local player_name = player:get_name()
 		local ability_table = minetest.deserialize(ability_str)
 		local inv = meta:get_inventory()
 		for i,item in ipairs(ability_table) do
@@ -228,7 +228,7 @@ api.basic_node = {
 	drop = '',
 
 	on_construct = on_construct,
-	after_place_node = after_place_node,
+	after_place_node = api.after_place_node,
 	on_receive_fields = api.on_receive_fields,
 
 	on_rightclick = on_rightclick,

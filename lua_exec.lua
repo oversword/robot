@@ -42,8 +42,8 @@ local function safe_string_find(...)
 	return string.find(...)
 end
 
-local function remove_functions(x)
-	local tp = type(x)
+local function remove_functions(xarg)
+	local tp = type(xarg)
 	if tp == "function" then
 		return nil
 	end
@@ -72,9 +72,9 @@ local function remove_functions(x)
 		end
 	end
 
-	rfuncs(x)
+	rfuncs(xarg)
 
-	return x
+	return xarg
 end
 
 local safe_globals = {
@@ -210,7 +210,7 @@ local function save_memory(pos, meta, mem)
 	else
 		print("Error: Luacontroller memory overflow. "..memsize_max.." bytes available, "
 				..#memstring.." required. Controller overheats.")
-		burn_controller(pos)
+		-- TODO: break or error?
 	end
 end
 
@@ -283,17 +283,17 @@ local function run_inner(pos, meta)
 	local env = create_environment(pos, mem, commands, send_warning)
 
 	-- Create the sandbox and execute code
-	local f, msg = create_sandbox(code, env)
-	if not f then return false, msg end
+	local sandbox_success, sandbox_msg = create_sandbox(code, env)
+	if not sandbox_success then return false, sandbox_msg end
 	-- Start string true sandboxing
 	local onetruestring = getmetatable("")
 	-- If a string sandbox is already up yet inconsistent, something is very wrong
 	assert(onetruestring.__index == string)
 	onetruestring.__index = env.string
-	local success, msg = pcall(f)
+	local run_success, run_msg = pcall(f)
 	onetruestring.__index = string
 	-- End string true sandboxing
-	if not success then return false, msg end
+	if not run_success then return false, run_msg end
 
 	-- Save memory. This may burn the luacontroller if a memory overflow occurs.
 	save_memory(pos, meta, env.mem)
