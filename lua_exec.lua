@@ -290,7 +290,7 @@ local function run_inner(pos, meta)
 	-- If a string sandbox is already up yet inconsistent, something is very wrong
 	assert(onetruestring.__index == string)
 	onetruestring.__index = env.string
-	local run_success, run_msg = pcall(f)
+	local run_success, run_msg = pcall(sandbox_success)
 	onetruestring.__index = string
 	-- End string true sandboxing
 	if not run_success then return false, run_msg end

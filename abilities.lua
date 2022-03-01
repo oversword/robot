@@ -230,7 +230,6 @@ if look_ability_item then
 		command_example = "node_name = robot.look()",
 		action = function (pos)
 			local node = minetest.get_node(pos)
-			local meta = minetest.get_meta(pos)
 
 			local direction = vector.subtract({x=0,y=0,z=0}, minetest.facedir_to_dir(node.param2))
 			local frontpos = vector.add(pos, direction)
@@ -366,7 +365,7 @@ if minetest.get_modpath('dispenser') then
 				return
 			end
 
-			local result, placed_pos = def.on_place(next_stack, player, {
+			local result = def.on_place(next_stack, player, {
 				type="node",
 				under=frontpos,
 				above=frontpos

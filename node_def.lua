@@ -105,7 +105,6 @@ local function after_dig_node(pos, oldnode, oldmeta_table, player)
 			or "robot:robot",
 		count = 1
 	})
-	local nodedef = stack:get_definition()
 	local stackmeta = stack:get_meta()
 
 	stackmeta:set_int('ignore_errors', oldmeta_table.fields.ignore_errors or 0)
