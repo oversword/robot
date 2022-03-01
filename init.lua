@@ -23,6 +23,8 @@ api.translations = {
 
 api.config = {}
 
+api.config.god_item = 'robot:god_ability'
+
 api.config.fuel_item = 'default:coal_lump'
 if minetest.get_modpath('tubelib_addons1') then
 	api.config.fuel_item = 'tubelib_addons1:biofuel'

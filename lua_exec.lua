@@ -249,7 +249,7 @@ local function run_inner(pos, meta)
 
 	for _,ability in ipairs(api.abilities) do
 		if ability.action then
-			if not inv:contains_item('abilities', ability.item) then
+			if not api.has_ability(meta, inv, ability.ability) then
 				commands[ability.ability] = function ()
 					error(api.translations.cant.." "..ability.ability..": "..api.translations.noability, 2)
 				end

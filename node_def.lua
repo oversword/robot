@@ -13,7 +13,7 @@ local function allow_metadata_inventory_put(pos, listname, index, stack, player)
 	elseif listname == 'abilities' then
 		-- Ability stack only accepts one of each ability item
 		local item = stack:get_name()
-		if api.abilities_item_index[item] then
+		if api.abilities_item_index[item] or item == api.config.god_item then
 			local meta = minetest.get_meta(pos)
 			local inv = meta:get_inventory()
 			if not inv:contains_item(listname, item) then
@@ -53,23 +53,37 @@ end
 local function on_metadata_inventory_put(pos, listname, index, stack, player)
 	if listname ~= 'abilities' then return end
 
+	local player_name = player:get_player_name()
 	local item_name = stack:get_name()
-	local ability = api.abilities_item_index[item_name]
-	if ability.modifier then
-		if not ability.un_modifier then
-			minetest.log("error", "[robot] Ability modifier will not run unless it has an un-modfier method.")
-			return
+	local meta = minetest.get_meta(pos)
+	local inv = meta:get_inventory()
+	if item_name == api.config.god_item then
+		for _,ability in ipairs(api.abilities) do
+			if not inv:contains_item(listname, ability.item) then
+				api.apply_ability(pos, player_name, ability)
+			end
 		end
-		ability.modifier(pos, player:get_player_name())
+	elseif not inv:contains_item(listname, api.config.god_item) then
+		local ability = api.abilities_item_index[item_name]
+		api.apply_ability(pos, player_name, ability)
 	end
 end
 local function on_metadata_inventory_take(pos, listname, index, stack, player)
 	if listname ~= 'abilities' then return end
 
+	local player_name = player:get_player_name()
 	local item_name = stack:get_name()
-	local ability = api.abilities_item_index[item_name]
-	if ability.un_modifier then
-		ability.un_modifier(pos, player:get_player_name())
+	local meta = minetest.get_meta(pos)
+	local inv = meta:get_inventory()
+	if item_name == api.config.god_item then
+		for _,ability in ipairs(api.abilities) do
+			if not inv:contains_item(listname, ability.item) then
+				api.unapply_ability(pos, player_name, ability)
+			end
+		end
+	elseif not inv:contains_item(listname, api.config.god_item) then
+		local ability = api.abilities_item_index[item_name]
+		api.unapply_ability(pos, player_name, ability)
 	end
 end
 local function on_metadata_inventory_move(pos, from_list, from_index, to_list, to_index, count, player)
@@ -150,13 +164,14 @@ local function after_place_node(pos, player, itemstack)
 			if item ~= "" then
 				inv:set_stack('abilities', i, item)
 
-				local ability = api.abilities_item_index[item]
-				if ability.modifier then
-					if not ability.un_modifier then
-						minetest.log("error", "[robot] Ability modifier will not run unless it has an un-modfier method.")
-						return
+				if item == api.config.god_item then
+					for _,ability in ipairs(api.abilities) do
+						-- if not exists already
+						api.apply_ability(pos, player_name, ability)
 					end
-					ability.modifier(pos, player:get_player_name())
+				else
+					local ability = api.abilities_item_index[item]
+					api.apply_ability(pos, player_name, ability)
 				end
 			end
 		end

@@ -6,6 +6,11 @@ api.abilities = {}
 api.abilities_item_index = {}
 api.abilities_ability_index = {}
 
+minetest.register_craftitem(api.config.god_item, {
+	description = "God Ability",
+	inventory_image = 'robot_god_ability_item.png'
+})
+
 function robot.add_ability(ability_obj)
 	local existing_ability_obj = api.abilities_ability_index[ability_obj.ability]
 	if existing_ability_obj then
@@ -69,9 +74,28 @@ function api.has_ability(meta, inv, ability)
 		inv = meta:get_inventory()
 	end
 	if not inv:contains_item('abilities', api.abilities_ability_index[ability].item) then
+		if inv:contains_item('abilities', api.config.god_item) then
+			return true
+		end
 		return false
 	end
 	return true
+end
+
+function api.apply_ability(pos, player_name, ability)
+	if ability.modifier then
+		if not ability.un_modifier then
+			minetest.log("error", "[robot] Ability modifier will not run unless it has an un-modfier method.")
+			return
+		end
+		ability.modifier(pos, player_name)
+	end
+end
+
+function api.unapply_ability(pos, player_name, ability)
+	if ability.un_modifier then
+		ability.un_modifier(pos, player_name)
+	end
 end
 
 
