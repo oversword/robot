@@ -155,8 +155,8 @@ function api.after_place_node(pos, player, itemstack)
 	if memory ~= "" then
 		meta:set_string('memory', minetest.deserialize(memory))
 	end
-	if ability_str ~= "" then
-		local player_name = player:get_name()
+	if ability_str ~= "" and player and player:is_player() then
+		local player_name = player:get_player_name()
 		local ability_table = minetest.deserialize(ability_str)
 		local inv = meta:get_inventory()
 		for i,item in ipairs(ability_table) do
