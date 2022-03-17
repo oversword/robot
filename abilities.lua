@@ -111,6 +111,7 @@ if turn_ability_item then
 		item = turn_ability_item,
 		description = S("Rotate the robot 90 degrees"),
 		command_example = "robot.rotate(<anticlockwise? true|false/nil>)",
+		done_by = { head = true, legs = true },
 		action = function (pos, anticlockwise)
 			local node = minetest.get_node(pos)
 			if anticlockwise then
@@ -133,6 +134,7 @@ if move_ability_item then
 		ability = "move",
 		item = move_ability_item,
 		description = S("Move one block forwards"),
+		done_by = { head = true, legs = true },
 		action = function (pos)
 			local node = minetest.get_node(pos)
 
@@ -183,6 +185,7 @@ if climb_ability_item then
 		ability = 'climb',
 		item = climb_ability_item,
 		description = S("Climb up and forwards one block"),
+		done_by = { head = true, legs = true },
 		action = function (pos)
 			local node = minetest.get_node(pos)
 			local meta = minetest.get_meta(pos)
@@ -228,6 +231,7 @@ if look_ability_item then
 		item = look_ability_item,
 		description = S("Get the name of the node in front of the robot"),
 		command_example = "node_name = robot.look()",
+		done_by = { head = true },
 		action = function (pos)
 			local node = minetest.get_node(pos)
 
@@ -255,6 +259,7 @@ if locate_ability_item then
 		item = locate_ability_item,
 		description = S("Get the position of the robot"),
 		command_example = "node_pos = robot.locate()",
+		done_by = { head = true },
 		action = function (pos)
 			return {
 				x = pos.x,
@@ -273,6 +278,7 @@ if minetest.get_modpath('dispenser') then
 		item = 'dispenser:dispenser',
 		description = S("Place a block down"),
 		command_example = "robot.place(<dir 'up'|'front'/nil|'down'>)",
+		done_by = { head = true, body = true },
 		action = function (pos, dir)
 			if not dir then dir = 'front' end
 
@@ -295,9 +301,7 @@ if minetest.get_modpath('dispenser') then
 			elseif dir == 'up' then
 				direction = {x=0,y=1,z=0}
 			elseif dir == 'down' then
-				if not api.abilities_ability_index.climb
-				  or not inv:contains_item('abilities', api.abilities_ability_index.climb.item)
-				then
+				if not api.has_ability(meta, inv, 'climb') then
 					error('requires climb ability to place block below', 2)
 					return
 				end
@@ -389,6 +393,7 @@ if use_ability_item and minetest.get_modpath('dispenser') then
 		ability = "use",
 		item = use_ability_item,
 		description = S("Use an item (not a tool)"),
+		done_by = { head = true, body = true },
 		action = function (pos)
 			local node = minetest.get_node(pos)
 
@@ -442,6 +447,38 @@ if use_ability_item and minetest.get_modpath('dispenser') then
 end
 
 
+local switch_ability_item
+if minetest.get_modpath('tubelib') then
+	switch_ability_item = 'tubelib:button'
+end
+if switch_ability_item and minetest.get_modpath('tubelib') then
+	robot.add_ability({
+		ability = 'switch',
+		item = switch_ability_item,
+		description = S("Switch a tubelib machine on and off"),
+		done_by = { head = true, body = true },
+		action = function (pos)
+			local node = minetest.get_node(pos)
+
+			local direction = vector.subtract({x=0,y=0,z=0}, minetest.facedir_to_dir(node.param2))
+			local frontpos = vector.add(pos, direction)
+
+			local tube_meta = minetest.get_meta(frontpos)
+
+			local state = tube_meta:get_int("tubelib_state")
+			local number = tubelib.get_node_number(frontpos)
+
+			if not state or not number or number == "" then return end
+
+			local meta = minetest.get_meta(pos)
+			local owner = meta:get_string('player_name')
+
+			tubelib.send_message(number, owner, nil, state == tubelib.STOPPED and "on" or "off", nil)
+		end
+	})
+end
+
+
 local push_ability_item
 if minetest.get_modpath('mesecons_movestones') then
 	push_ability_item = "mesecons_movestones:movestone"
@@ -450,6 +487,7 @@ if push_ability_item and minetest.get_modpath('mesecons_mvps') then
 	robot.add_ability({
 		ability = 'push',
 		item = push_ability_item,
+		done_by = { legs = true, body = true },
 		description = S("Push a block when moving forwards")
 	})
 end
@@ -468,6 +506,7 @@ if carry_ability_item then
 		ability = "carry",
 		item = carry_ability_item,
 		description = S("Expand the item inventory"),
+		done_by = { legs = true, body = true },
 		modifier = function(pos, player_name)
 			local meta = minetest.get_meta(pos)
 			local inv = meta:get_inventory()
@@ -502,6 +541,7 @@ if fuel_ability_item then
 		ability = "fuel",
 		item = fuel_ability_item,
 		description = S("Expand the fuel inventory"),
+		done_by = { head = true, legs = true, body = true },
 		modifier = function(pos, player_name)
 			local meta = minetest.get_meta(pos)
 			local inv = meta:get_inventory()
@@ -549,9 +589,11 @@ if fill_ability_item and minetest.get_modpath('tubelib') then
 	robot.add_ability({
 		ability = 'fill',
 		item = fill_ability_item,
+		done_by = { legs = true, body = true },
 		description = S("Fill and empty the inventory using pushers"),
 	})
 end
+
 
 
 local speed_ability_item
@@ -565,6 +607,7 @@ if speed_ability_item then
 		ability = 'speed',
 		item = speed_ability_item,
 		description = S("Make the robot run twice as fast"),
+		done_by = { legs = true, head = true },
 		modifier = function (pos)
 			local node = minetest.get_node(pos)
 			node.param1 = 1
@@ -578,8 +621,69 @@ if speed_ability_item then
 	})
 end
 
+--[[
+programibility
+digilines programability?
+connectivity
+
+tiers = {
+	man = {
+		delay = 2,
+		ability_slots = 5,
+		inventory_size = 1,
+		form_size = 8,
+	},
+	devil = {
+		delay = 3,
+		ability_slots = 6,
+		inventory_size = 2,
+		form_size = 9,
+		extra_abilities = {
+			{
+				name = "boost",
+				description = "Speed up but use more fuel randomly",
+			},
+		}
+	},
+	god = {
+		delay = 4,
+		ability_slots = 7,
+		inventory_size = 4,
+		form_size = 10,
+		extra_abilities = {
+			{
+				name = "fuel_swap",
+				description = "Swap some normal inventory for fuel inventory",
+			},
+			{
+				name = "boost",
+				description = "Speed up but use more fuel randomly",
+			},
+		}
+	},
+}
+
+head = {
+},
+body = {
+	connects_above = {head=true},
+	default_abilities = {carry=true,fuel=true}
+},
+legs = {
+	connects_above = {head=true,body=true},
+	default_abilities = {move=true,turn=true}
+}
+
+]]
+
 
 function api.stop_action (pos)
 	api.set_status(pos, minetest.get_meta(pos), 'stopped')
+	return nil, 0
+end
+function api.log_action (pos,...)
+	local meta = minetest.get_meta(pos)
+	local owner = meta:get_string('player_name')
+	minetest.chat_send_player(owner, "[robot] LOG: "..dump({...}))
 	return nil, 0
 end

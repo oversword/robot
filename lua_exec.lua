@@ -180,7 +180,7 @@ local function create_sandbox(code, env)
 	end
 
 	-- TODO: settings
-	local maxevents = 10000--mesecon.setting("luacontroller_maxevents", 10000)
+	local maxevents = 999999999--10000--mesecon.setting("luacontroller_maxevents", 10000)
 	return function(...)
 		-- NOTE: This runs within string metatable sandbox, so the setting's been moved out for safety
 		-- Use instruction counter to stop execution
@@ -279,6 +279,18 @@ local function run_inner(pos, meta)
 			args = {}
 		}
 	end
+	local logs = {}
+	-- commands.log = function (...)
+	-- 	local lg = {}
+	-- 	for i,v in ipairs({...}) do
+	-- 		if type(v) == 'table' then
+	-- 			table.insert(lg, table.copy(v))
+	-- 		else
+	-- 			table.insert(lg, v)
+	-- 		end
+	-- 	end
+	-- 	table.insert(logs, lg)
+	-- end
 
 	local env = create_environment(pos, mem, commands, send_warning)
 
@@ -298,10 +310,18 @@ local function run_inner(pos, meta)
 	-- Save memory. This may burn the luacontroller if a memory overflow occurs.
 	save_memory(pos, meta, env.mem)
 
+	-- if #logs then
+	-- 	for i,l in ipairs(logs) do
+	-- 		minetest.log("error", dump(l))
+	-- 	end
+	-- end
+
 	if action_call then
 		local action_func
 		if action_call.ability == 'stop' then
 			action_func = api.stop_action
+		elseif action_call.ability == 'log' then
+			action_func = api.log_action
 		else
 			local ability_obj = api.abilities_ability_index[action_call.ability]
 			action_func = ability_obj.action
