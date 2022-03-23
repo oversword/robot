@@ -222,10 +222,9 @@ function api.on_receive_fields(pos, form_name, fields, sender)
 		return
 	end
 	if fields.status then
-		local meta = nodeinfo.meta()
 		local status = nodeinfo.info().status
 		if status == 'stopped' then
-			meta:set_string('error', '')
+			api.clear_error(nodeinfo)
 			api.set_status(nodeinfo, 'running')
 			minetest.show_formspec(player_name, '', '')
 		elseif status == 'running' then
@@ -233,7 +232,7 @@ function api.on_receive_fields(pos, form_name, fields, sender)
 		elseif status == 'error' then
 			api.formspec_data[player_name] = api.formspec_data[player_name] or {}
 			api.formspec_data[player_name].pos = pos
-			minetest.show_formspec(player_name, 'robot_error', api.formspecs.error(meta:get_string('error')))
+			minetest.show_formspec(player_name, 'robot_error', api.formspecs.error(nodeinfo.meta():get_string('error')))
 		elseif status == 'broken' then
 			minetest.show_formspec(player_name, 'robot_broken', api.formspecs.broken())
 		end

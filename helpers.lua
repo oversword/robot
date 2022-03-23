@@ -65,9 +65,17 @@ function api.set_status(nodeinfo, status)
 	end
 end
 
+function api.clear_error(nodeinfo)
+	for _,n in ipairs(nodeinfo.robot_set()) do
+		n.meta():set_string('error', '')
+	end
+end
+
 function api.set_error(nodeinfo, error)
 	local meta = nodeinfo.meta()
-	meta:set_string("error", error)
+	for _,n in ipairs(nodeinfo.robot_set()) do
+		n.meta():set_string('error', error)
+	end
 	if meta:get_int('ignore_errors') ~= 1 then
 		api.set_status(nodeinfo, 'error')
 	end

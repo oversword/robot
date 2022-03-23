@@ -399,8 +399,7 @@ if minetest.global_exists('tubelib') then
 		api.tubelib_options.on_node_repair = function(pos)
 			local nodeinfo = api.nodeinfo(pos)
 			if nodeinfo.info().status ~= 'broken' then return end
-			local meta = nodeinfo.meta()
-			meta:set_string('error', '')
+			api.clear_error(nodeinfo)
 			api.set_status(nodeinfo, 'stopped')
 			return true
 		end

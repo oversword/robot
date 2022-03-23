@@ -292,7 +292,7 @@ if api.config.repair_item ~= 'tubelib:repairkit' then
 		if taken:is_empty() then return end
 
 		local meta = nodeinfo.meta()
-		meta:set_string('error', '')
+		api.clear_error(nodeinfo)
 		api.set_status(nodeinfo, 'stopped')
 
 		return puncher:set_wielded_item(item)
