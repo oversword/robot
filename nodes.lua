@@ -47,7 +47,7 @@ local function on_timer (pos, dtime)
 	if newinfo then
 		nodeinfo = newinfo
 	end
-	if nodeinfo.boost_enabled() and math.random() > 0.5 then
+	if nodeinfo.any_boost_enabled() and math.random() > 0.5 then
 		fuel_used = fuel_used + 1
 	end
 	if fuel_used and fuel_used > 0 then

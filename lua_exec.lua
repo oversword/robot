@@ -252,7 +252,7 @@ local function run_inner(nodeinfo)
 
 	for _,ability in ipairs(api.abilities) do
 		if ability.action then
-			if not api.has_ability(nodeinfo, ability.ability) then
+			if not api.any_has_ability(nodeinfo, ability.ability) then
 				commands[ability.ability] = function ()
 					error(api.translations.cant.." "..ability.ability..": "..api.translations.noability, 2)
 				end

@@ -290,6 +290,12 @@ local function after_construct(pos)
 		api.correct_connection(api.nodeinfo(vector.subtract(pos, {x=0,y=1,z=0})))
 	end
 	meta:set_string('pos', minetest.pos_to_string(pos))
+
+		api.stop_timer(nodeinfo)
+		-- Need to do this so we can keep running after falling
+		if nodeinfo.info().status == 'running' then
+			api.start_timer(nodeinfo)
+		end
 end
 local function on_construct(pos)
 	local nodeinfo = api.nodeinfo(pos)
@@ -318,18 +324,12 @@ local function on_construct(pos)
 	end
 	inv:set_size('abilities', (tier_def.ability_slots or 5)-default_abilities)
 
-	api.stop_timer(nodeinfo)
-	-- Need to do this so we can keep running after falling
-	if info.status ~= 'broken' then
-		api.start_timer(nodeinfo)
-	end
 	minetest.after(0.1, after_construct, pos)
 end
 
 local function on_rightclick(pos, node, clicker, itemstack, pointed_thing)
 	local nodeinfo = api.nodeinfo(pos, node)
 	if nodeinfo.info().status == 'running' then
-		minetest.log("error", "rightclick")
 		api.set_status(nodeinfo, 'stopped')
 	end
 end

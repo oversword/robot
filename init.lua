@@ -119,6 +119,16 @@ api.add_nodeinfo('boost_enabled', function (nodeapi)
 	local param1 = nodeapi.node().param1
 	return math.floor(param1 / 2) % 2 == 1
 end, {'node.param1'})
+api.add_nodeinfo('any_speed_enabled', function (nodeapi)
+	for _,n in ipairs(nodeapi.robot_set()) do
+		if n.speed_enabled() then return true end
+	end
+end, {'speed_enabled','pos','robot_set'})
+api.add_nodeinfo('any_boost_enabled', function (nodeapi)
+	for _,n in ipairs(nodeapi.robot_set()) do
+		if n.boost_enabled() then return true end
+	end
+end, {'boost_enabled','pos','robot_set'})
 
 
 

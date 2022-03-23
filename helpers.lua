@@ -10,12 +10,19 @@ end
 function api.start_timer(nodeinfo)
 	local timer = minetest.get_node_timer(nodeinfo.pos())
 	if not timer:is_started() then
-		local info = nodeinfo.info()
-		local delay = api.tiers[info.tier].delay
-		if nodeinfo.speed_enabled() then
+		local ns = nodeinfo.robot_set()
+		local delay = 0
+		for _,n in ipairs(ns) do
+			local d = api.tiers[n.info().tier].delay
+			if d > delay then
+				delay = d
+			end
+		end
+		if delay == 0 then return end
+		if nodeinfo.any_speed_enabled() then
 			delay = delay / 2
 		end
-		if nodeinfo.boost_enabled() then
+		if nodeinfo.any_boost_enabled() then
 			delay = delay / 2
 		end
 		timer:start(delay)
@@ -41,15 +48,14 @@ function api.can_move_to(pos)
 end
 
 function api.set_status(nodeinfo, status)
-	minetest.log("error", dump(nodeinfo.robot_set()))
 	for _, n in ipairs(nodeinfo.robot_set()) do
 		local info = n.info()
 		local meta = n.meta()
 
 		if status ~= info.status then
 			n.set_node({ name = api.robot_name(info.tier, info.part, status) })
+			api.update_formspec(n)
 		end
-		-- meta:set_string('status', status)
 	end
 
 	if status == 'running' then
@@ -57,8 +63,6 @@ function api.set_status(nodeinfo, status)
 	else
 		api.stop_timer(nodeinfo)
 	end
-
-	api.update_formspec(nodeinfo)
 end
 
 function api.set_error(nodeinfo, error)
