@@ -194,17 +194,19 @@ local function create_sandbox(code, env)
 end
 
 
-local function load_memory(meta)
+local function load_memory(nodeinfo)
+	local meta = nodeinfo.meta()
 	return minetest.deserialize(meta:get_string("memory"), true) or {}
 end
 
 
-local function save_memory(pos, meta, mem)
+local function save_memory(nodeinfo, mem)
 	local memstring = minetest.serialize(remove_functions(mem))
 	-- TODO: settings
 	local memsize_max = 100000--mesecon.setting("luacontroller_memsize", 100000)
 
 	if (#memstring <= memsize_max) then
+		local meta = nodeinfo.meta()
 		meta:set_string("memory", memstring)
 		meta:mark_as_private("memory")
 	else
@@ -214,7 +216,7 @@ local function save_memory(pos, meta, mem)
 	end
 end
 
-local function runtime_ability(pos, action)
+local function runtime_ability(nodeinfo, action)
 	local ran = false
 	local result
 	return function (...)
@@ -222,19 +224,20 @@ local function runtime_ability(pos, action)
 			return result
 		end
 		ran = true
-		result = action(pos, ...)
+		result = action(nodeinfo, ...)
 		return result
 	end
 end
 
 -- Returns success (boolean), errmsg (string)
 -- run (as opposed to run_inner) is responsible for setting up meta according to this output
-local function run_inner(pos, meta)
+local function run_inner(nodeinfo)
 
 	-- Load code & mem from meta
-	local mem  = load_memory(meta)
+	local mem  = load_memory(nodeinfo)
+	local meta = nodeinfo.meta()
 	local code = meta:get_string("code")
-	local inv = meta:get_inventory()
+	local pos = nodeinfo.pos()
 
 	-- 'Last warning' label.
 	local warning = ""
@@ -249,12 +252,12 @@ local function run_inner(pos, meta)
 
 	for _,ability in ipairs(api.abilities) do
 		if ability.action then
-			if not api.has_ability(meta, inv, ability.ability) then
+			if not api.has_ability(nodeinfo, ability.ability) then
 				commands[ability.ability] = function ()
 					error(api.translations.cant.." "..ability.ability..": "..api.translations.noability, 2)
 				end
 			elseif ability.runtime then
-				commands[ability.ability] = runtime_ability(pos, ability.action)
+				commands[ability.ability] = runtime_ability(nodeinfo, ability.action)
 			else
 				commands[ability.ability] = function (...)
 					if action_call then
@@ -308,7 +311,7 @@ local function run_inner(pos, meta)
 	if not run_success then return false, run_msg end
 
 	-- Save memory. This may burn the luacontroller if a memory overflow occurs.
-	save_memory(pos, meta, env.mem)
+	save_memory(nodeinfo, env.mem)
 
 	-- if #logs then
 	-- 	for i,l in ipairs(logs) do
@@ -327,13 +330,13 @@ local function run_inner(pos, meta)
 			action_func = ability_obj.action
 		end
 
-		local action_success, new_pos_or_err, fuel_used = pcall(action_func, pos, unpack(action_call.args))
+		local action_success, newinfo_or_err, fuel_used = pcall(action_func, nodeinfo, unpack(action_call.args))
 
 		if not action_success then
-			return false, api.translations.cant.." "..action_call.ability..": "..new_pos_or_err
+			return false, api.translations.cant.." "..action_call.ability..": "..newinfo_or_err
 		end
 
-		return true, warning, new_pos_or_err, fuel_used or 1
+		return true, warning, newinfo_or_err, fuel_used or 1
 	end
 	return true, warning
 end

@@ -31,7 +31,7 @@ The abilities index will list all abilities
 "Edit program" will open  the program editing formspec
 "Save program" will store the current code
 "Save program" will set the status to "stopped" if the status is "error"
-"Save program" will clear the current error messag if the status is "error"
+"Save program" will clear the current error message if the status is "error"
 "Save program" will return the player to the inventory formspec
 "Reset memory" will completely clear the internal memory of the robot
 "Reset memory" will not return the player to the inventory formspec

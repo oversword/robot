@@ -1,35 +1,33 @@
 local api = robot.internal_api
 
-function api.stop_timer(pos)
-	local timer = minetest.get_node_timer(pos)
+function api.stop_timer(nodeinfo)
+	local timer = minetest.get_node_timer(nodeinfo.pos())
 	if timer:is_started() then
 		timer:stop()
 	end
 end
 
-function api.start_timer(pos, fast)
-	local timer = minetest.get_node_timer(pos)
+function api.start_timer(nodeinfo)
+	local timer = minetest.get_node_timer(nodeinfo.pos())
 	if not timer:is_started() then
-		if fast then
-			timer:start(api.config.step_delay/2)
-		else
-			timer:start(api.config.step_delay)
+		local info = nodeinfo.info()
+		local delay = api.tiers[info.tier].delay
+		if nodeinfo.speed_enabled() then
+			delay = delay / 2
 		end
+		if nodeinfo.boost_enabled() then
+			delay = delay / 2
+		end
+		timer:start(delay)
 	end
 end
 
-function api.move_robot(node, meta, pos, new_pos)
-	minetest.set_node(new_pos, node)
-	local new_meta = minetest.get_meta(new_pos)
-	new_meta:from_table(meta:to_table())
-	new_meta:set_string('pos', minetest.pos_to_string(new_pos))
+function api.move_robot(nodeinfo, new_pos)
+	nodeinfo.set_pos(new_pos)
+	local new_meta = nodeinfo.meta()
+	-- new_meta:set_string('pos', minetest.pos_to_string(new_pos))
 	new_meta:mark_as_private('code')
 	new_meta:mark_as_private('memory')
-	minetest.remove_node(pos)
-
-	minetest.after(0.01, api.stop_timer, pos)
-	-- minetest.sound_play("movestone", { pos = pos, max_hear_distance = 20, gain = 0.5 }, true)
-	return new_meta
 end
 
 function api.can_move_to(pos)
@@ -42,35 +40,31 @@ function api.can_move_to(pos)
 	return false
 end
 
-function api.set_status(pos, meta, status)
-	local node = minetest.get_node(pos)
-	if status == 'running' and node.name ~= "robot:robot_running" then
-		node.name = 'robot:robot_running'
-		minetest.swap_node(pos, node)
-	elseif status == 'error' and node.name ~= "robot:robot_error" then
-		node.name = 'robot:robot_error'
-		minetest.swap_node(pos, node)
-	elseif status == 'broken' and node.name ~= "robot:robot_broken" then
-		node.name = 'robot:robot_broken'
-		minetest.swap_node(pos, node)
-	elseif status == 'stopped' and node.name ~= "robot:robot" then
-		node.name = 'robot:robot'
-		minetest.swap_node(pos, node)
+function api.set_status(nodeinfo, status)
+	minetest.log("error", dump(nodeinfo.robot_set()))
+	for _, n in ipairs(nodeinfo.robot_set()) do
+		local info = n.info()
+		local meta = n.meta()
+
+		if status ~= info.status then
+			n.set_node({ name = api.robot_name(info.tier, info.part, status) })
+		end
+		-- meta:set_string('status', status)
 	end
 
 	if status == 'running' then
-		api.start_timer(pos, node.param1 == 1)
+		api.start_timer(nodeinfo)
 	else
-		api.stop_timer(pos)
+		api.stop_timer(nodeinfo)
 	end
 
-	meta:set_string('status', status)
-	api.update_formspec(pos, meta)
+	api.update_formspec(nodeinfo)
 end
 
-function api.set_error(pos, meta, error)
+function api.set_error(nodeinfo, error)
+	local meta = nodeinfo.meta()
 	meta:set_string("error", error)
 	if meta:get_int('ignore_errors') ~= 1 then
-		api.set_status(pos, meta, 'error')
+		api.set_status(nodeinfo, 'error')
 	end
 end

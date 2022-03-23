@@ -12,10 +12,6 @@ minetest.register_craftitem(api.config.god_item, {
 })
 
 function robot.add_ability(ability_obj)
-	local existing_ability_obj = api.abilities_ability_index[ability_obj.ability]
-	if existing_ability_obj then
-		minetest.log("warning", ("[robot] overriding %s ability"):format(ability_obj.ability))
-	end
 	local existing_item_ability = api.abilities_item_index[ability_obj.item]
 	if existing_item_ability and existing_item_ability.ability ~= ability_obj.ability then
 		error(("An ability already exists for this item: '%s'."):format(ability_obj.item))
@@ -25,15 +21,20 @@ function robot.add_ability(ability_obj)
 		error("You must define an ability name as ability_obj.ability")
 		return
 	end
-	if not ability_obj.item then
-		error("You must define an ability item as ability_obj.item")
-		return
-	end
 	if not ability_obj.description then
 		error("You must define an ability description as ability_obj.description")
 		return
 	end
+	if type(ability_obj.item) == 'function' then
+		local item = ability_obj.item()
+		ability_obj.item = item
+	end
+	if not ability_obj.item then
+		minetest.log("warning", ("[robot] ability %s will not be usable until an item is set for it"):format(ability_obj.ability))
+	end
+	local existing_ability_obj = api.abilities_ability_index[ability_obj.ability]
 	if existing_ability_obj then
+		minetest.log("warning", ("[robot] overriding %s ability"):format(ability_obj.ability))
 		local new_abilities = {}
 		for _,ability in ipairs(api.abilities) do
 			if ability.ability == ability_obj.ability then
@@ -66,88 +67,161 @@ function robot.set_ability_item(ability, item)
 	ability_obj.item = item
 end
 
-function api.has_ability(meta, inv, ability)
-	if not api.abilities_ability_index[ability] then
-		return false
+function api.ability_enabled(ability)
+	local ability_obj = api.abilities_ability_index[ability]
+	if not ability_obj then return false end
+	if ability_obj.disabled then return false end
+	if not ability_obj.item then return false end
+	return ability_obj
+end
+
+function api.any_has_ability(nodeinfo, ability, ignore_god_item)
+	local nodeinfos = nodeinfo.robot_set()
+	for _,nodeinfo in ipairs(nodeinfos) do
+		if api.has_ability(nodeinfo, ability, ignore_god_item) then return nodeinfo end
 	end
-	if not inv then
-		inv = meta:get_inventory()
-	end
-	if not inv:contains_item('abilities', api.abilities_ability_index[ability].item) then
-		if inv:contains_item('abilities', api.config.god_item) then
+end
+
+function api.has_ability(nodeinfo, ability, ignore_god_item)
+	local ability_obj = api.ability_enabled(ability)
+	if not ability_obj then return end
+	local info = nodeinfo.info()
+	if not info.part then return end
+	for _,def_ability in ipairs(api.parts[info.part].default_abilities or {}) do
+		if def_ability == ability then
 			return true
 		end
-		return false
 	end
+	if ability_obj.done_by and not ability_obj.done_by[info.part] then return end
+
+	local extras_enabled_list = string.split(nodeinfo.meta():get_string('extras'),',')
+	for _,def in ipairs(extras_enabled_list) do
+		if def == ability and api.tiers[info.tier].extra_abilities then
+			for _,ab in ipairs(api.tiers[info.tier].extra_abilities) do
+				if ab == ability then return true end
+			end
+		end
+	end
+
+	local inv = nodeinfo.inv()
+	if not ignore_god_item and not ability_obj.interface_enabled and inv:contains_item('abilities', api.config.god_item) then
+		return true
+	end
+	if inv:contains_item('abilities', ability_obj.item) then
+		return true
+	end
+end
+
+function api.can_have_ability_item(nodeinfo, item)
+	if item == api.config.god_item then return true end
+	local ability = api.abilities_item_index[item]
+	if not ability then return end
+	if ability.interface_enabled then return end
+	local info = nodeinfo.info()
+	if not info.part then return end
+	for _,def_ability in ipairs(api.parts[info.part].default_abilities or {}) do
+		if def_ability == ability.ability then return end
+	end
+	if ability.done_by and not ability.done_by[info.part] then return end
+
+	local inv = nodeinfo.inv()
+	if inv:contains_item('abilities', item) then return end
+
 	return true
 end
 
-function api.apply_ability(pos, player_name, ability)
+function api.can_have_ability(nodeinfo, ability_name)
+	local ability = api.abilities_ability_index[ability_name]
+	if not ability then return end
+	if ability.interface_enabled then return end
+	local info = nodeinfo.info()
+	if not info.part then return end
+	for _,def_ability in ipairs(api.parts[info.part].default_abilities or {}) do
+		if def_ability == ability.ability then return end
+	end
+	if ability.done_by and not ability.done_by[info.part] then return end
+
+	local inv = nodeinfo.inv()
+	if inv:contains_item('abilities', ability.item) then return end
+
+	return true
+end
+
+function api.apply_ability(nodeinfo, player_name, ability)
+	-- minetest.log("error", "apply "..ability.ability)
 	if ability.modifier then
 		if not ability.un_modifier then
 			minetest.log("error", "[robot] Ability modifier will not run unless it has an un-modfier method.")
 			return
 		end
-		ability.modifier(pos, player_name)
+		ability.modifier(nodeinfo, player_name)
 	end
 end
 
-function api.unapply_ability(pos, player_name, ability)
+function api.unapply_ability(nodeinfo, player_name, ability)
 	if ability.un_modifier then
-		ability.un_modifier(pos, player_name)
+		ability.un_modifier(nodeinfo, player_name)
 	end
 end
 
 
-local turn_ability_item
-if minetest.get_modpath('rhotator') then
-	turn_ability_item = 'rhotator:screwdriver'
-elseif minetest.get_modpath('screwdriver') then
-	turn_ability_item = 'screwdriver:screwdriver'
-end
-if turn_ability_item then
-	robot.add_ability({
-		ability = 'turn',
-		item = turn_ability_item,
-		description = S("Rotate the robot 90 degrees"),
-		command_example = "robot.rotate(<anticlockwise? true|false/nil>)",
-		done_by = { head = true, legs = true },
-		action = function (pos, anticlockwise)
-			local node = minetest.get_node(pos)
-			if anticlockwise then
-				node.param2 = (node.param2-1)%4
-			else
-				node.param2 = (node.param2+1)%4
-			end
-			minetest.swap_node(pos, node)
+robot.add_ability({
+	ability = 'turn',
+	item = function()
+		if minetest.get_modpath('rhotator') then
+			return 'rhotator:screwdriver'
+		elseif minetest.get_modpath('screwdriver') then
+		 return 'screwdriver:screwdriver'
 		end
-	})
-end
+	end,
+	description = S("Rotate the robot 90 degrees"),
+	command_example = "robot.turn(<anticlockwise? true|false/nil>)",
+	done_by = { head = true, legs = true },
+	act_on = 'all',
+	depends_on = 'any',
+	action = function (nodeinfo, anticlockwise)
+		local ns = nodeinfo.robot_set()
+		for _, n in ipairs(ns) do
+			local node = n.node()
+			n.set_node({
+				param2 = anticlockwise
+					and (node.param2-1)%4
+					or (node.param2+1)%4
+			})
+		end
+	end
+})
 
 
-local move_ability_item
-if minetest.get_modpath('carts') then
-	move_ability_item = "carts:cart"
-end
-if move_ability_item then
-	robot.add_ability({
-		ability = "move",
-		item = move_ability_item,
-		description = S("Move one block forwards"),
-		done_by = { head = true, legs = true },
-		action = function (pos)
-			local node = minetest.get_node(pos)
+robot.add_ability({
+	ability = 'move',
+	item = function ()
+		if minetest.get_modpath('carts') then
+			return "carts:cart"
+		end
+	end,
+	description = S("Move one block forwards"),
+	done_by = { head = true, legs = true },
+	act_on = 'all',
+	depends_on = 'any',
+	action = function (nodeinfo)
+		local ns = nodeinfo.robot_set()
+		local frontpos = nodeinfo.front()
 
-			local direction = vector.subtract({x=0,y=0,z=0}, minetest.facedir_to_dir(node.param2))
-			local frontpos = vector.add(pos, direction)
-
-			local meta = minetest.get_meta(pos)
-
-			local owner = meta:get_string('player_name')
-			if api.has_ability(meta, nil, 'push') then
-				-- ### Step 1: Push nodes in front ###
-				local success, stack, oldstack = mesecon.mvps_push(frontpos, direction, api.config.max_push, owner)
+		local meta = nodeinfo.meta()
+		local owner = meta:get_string('player_name')
+		local above = vector.add(ns[1].pos(), {x=0, y=1, z=0})
+		if api.any_has_ability(nodeinfo, 'push') then
+			-- ### Step 1: Push nodes in front ###
+			local moved = false
+			for _,n in ipairs(ns) do
+				local new_pos = n.front()
+				local success, stack, oldstack = mesecon.mvps_push(new_pos, n.direction(), api.config.max_push, owner)
 				if not success then
+					if moved then
+						minetest.check_for_falling(n.pos())
+						minetest.check_for_falling(above)
+					end
 					if stack == "protected" then
 						error("protected area in the way", 2)
 						return
@@ -155,46 +229,66 @@ if move_ability_item then
 					error("blocked", 2)
 					return
 				end
-				mesecon.mvps_move_objects(frontpos, direction, oldstack)
-			elseif minetest.is_protected(frontpos, owner) then
-				error("protected area in the way", 2)
-				return
-			elseif not api.can_move_to(frontpos) then
+				mesecon.mvps_move_objects(new_pos, n.direction(), oldstack)
+				api.move_robot(n, new_pos)
+				moved = true
+			end
+			-- ### Step 4: Let things fall ###
+			if moved then
+				minetest.check_for_falling(ns[#ns].pos())
+				minetest.check_for_falling(above)
+			end
+		else
+			local above = vector.add(ns[1].pos(), {x=0, y=1, z=0})
+			local can_move = true
+			for _,n in ipairs(ns) do
+				local frontpos = n.front()
+				if minetest.is_protected(frontpos, owner) then
+					error("protected area in the way", 2)
+					return
+				end
+				if not api.can_move_to(frontpos) then
+					can_move = false
+					break
+				end
+			end
+			if not can_move then
 				error("blocked", 2)
 				return
 			end
-
 			-- ### Step 2: Move the movestone ###
-			api.move_robot(node, meta, pos, frontpos)
-
+			for _,n in ipairs(ns) do
+				local new_pos = n.front()
+				api.move_robot(n, new_pos)
+			end
 			-- ### Step 4: Let things fall ###
-			minetest.check_for_falling(vector.add(pos, {x=0, y=1, z=0}))
-
-			return frontpos
+			minetest.check_for_falling(ns[#ns].pos())
+			minetest.check_for_falling(above)
 		end
-	})
-end
+	end
+})
 
 
-local climb_ability_item
-if minetest.get_modpath('mesecons_pistons') then
-	climb_ability_item = 'mesecons_pistons:piston_normal_off'
-end
-if climb_ability_item then
-	robot.add_ability({
-		ability = 'climb',
-		item = climb_ability_item,
-		description = S("Climb up and forwards one block"),
-		done_by = { head = true, legs = true },
-		action = function (pos)
-			local node = minetest.get_node(pos)
-			local meta = minetest.get_meta(pos)
 
-			local direction = vector.subtract({x=0,y=0,z=0}, minetest.facedir_to_dir(node.param2))
-			local frontpos = vector.add(pos, direction)
-			local uppos = vector.add(frontpos, {x=0,y=1,z=0})
+robot.add_ability({
+	ability = 'climb',
+	item = function ()
+		if minetest.get_modpath('mesecons_pistons') then
+			return 'mesecons_pistons:piston_normal_off'
+		end
+	end,
+	description = S("Climb up and forwards one block"),
+	done_by = { head = true, legs = true },
+	act_on = 'all',
+	depends_on = 'any',
+	action = function (nodeinfo)
+		local ns = nodeinfo.robot_set()
+		local lastinfo = ns[#ns]
+		local meta = nodeinfo.meta()
+		local owner = meta:get_string('player_name')
 
-			local owner = meta:get_string('player_name')
+		for _, n in ipairs(ns) do
+			local uppos = vector.add(n.front(), {x=0,y=1,z=0})
 			if minetest.is_protected(uppos, owner) then
 				error("protected area in the way", 2)
 				return
@@ -202,424 +296,547 @@ if climb_ability_item then
 				error("blocked", 2)
 				return
 			end
-
-			local under_node = minetest.get_node(frontpos)
-			local under_node_def  = minetest.registered_nodes[under_node.name]
-			if not under_node_def.walkable then
-				error("no support", 2)
-				return
-			end
-
-			-- TODO: ray trace to make sure the hitbox isn't blocking?
-			api.move_robot(node, meta, pos, uppos)
-
-			return uppos
 		end
-	})
-end
+
+		local under_node = minetest.get_node(lastinfo.front())
+		local under_node_def  = minetest.registered_nodes[under_node.name]
+		if not under_node_def.walkable then
+			error("no support", 2)
+			return
+		end
+
+		-- TODO: ray trace to make sure the hitbox isn't blocking?
+		for _, n in ipairs(ns) do
+			n.set_pos(vector.add(n.front(), {x=0,y=1,z=0}))
+		end
+	end
+})
 
 
-local look_ability_item
-if minetest.get_modpath('mesecons_detector') then
-	look_ability_item = 'mesecons_detector:node_detector_off'
-elseif minetest.get_modpath('binoculars') then
-	look_ability_item = "binoculars:binoculars"
-end
-if look_ability_item then
-	robot.add_ability({
-		ability = "look",
-		item = look_ability_item,
-		description = S("Get the name of the node in front of the robot"),
-		command_example = "node_name = robot.look()",
-		done_by = { head = true },
-		action = function (pos)
-			local node = minetest.get_node(pos)
 
-			local direction = vector.subtract({x=0,y=0,z=0}, minetest.facedir_to_dir(node.param2))
-			local frontpos = vector.add(pos, direction)
+robot.add_ability({
+	ability = "look",
+	item = function ()
+		if minetest.get_modpath('mesecons_detector') then
+			return 'mesecons_detector:node_detector_off'
+		elseif minetest.get_modpath('binoculars') then
+			return "binoculars:binoculars"
+		end
+	end,
+	description = S("Get the name of the node in front of the robot"),
+	command_example = "node_name = robot.look()",
+	done_by = { head = true },
+	act_on = 'first',
+	depends_on = 'self',
+	action = function (nodeinfo)
+		local actorinfo = api.any_has_ability(nodeinfo, 'look')
+		if not actorinfo then return end
 
-			local front_node = minetest.get_node(frontpos)
-
-			return front_node.name
-		end,
-		runtime = true
-	})
-end
+		return minetest.get_node(actorinfo.front()).name
+	end,
+	runtime = true
+})
 
 
-local locate_ability_item
-if minetest.get_modpath('orienteering') then
-	locate_ability_item = 'orienteering:gps'
-elseif minetest.get_modpath('map') then
-	locate_ability_item = 'map:mapping_kit'
-end
-if locate_ability_item then
-	robot.add_ability({
-		ability = "locate",
-		item = locate_ability_item,
-		description = S("Get the position of the robot"),
-		command_example = "node_pos = robot.locate()",
-		done_by = { head = true },
-		action = function (pos)
-			return {
-				x = pos.x,
-				y = pos.y,
-				z = pos.z,
-			}
-		end,
-		runtime = true
-	})
-end
+robot.add_ability({
+	ability = "locate",
+	item = function ()
+		if minetest.get_modpath('orienteering') then
+			return 'orienteering:gps'
+		elseif minetest.get_modpath('map') then
+			return 'map:mapping_kit'
+		end
+	end,
+	act_on = 'last',
+	depends_on = 'any',
+	description = S("Get the position of the robot"),
+	command_example = "node_pos = robot.locate()",
+	done_by = { head = true },
+	action = function (nodeinfo)
+		local ns = nodeinfo.robot_set()
+		local pos = ns[#ns].pos()
+		return {
+			x = pos.x,
+			y = pos.y,
+			z = pos.z,
+		}
+	end,
+	runtime = true
+})
 
 
-if minetest.get_modpath('dispenser') then
-	robot.add_ability({
-		ability = 'place',
-		item = 'dispenser:dispenser',
-		description = S("Place a block down"),
-		command_example = "robot.place(<dir 'up'|'front'/nil|'down'>)",
-		done_by = { head = true, body = true },
-		action = function (pos, dir)
-			if not dir then dir = 'front' end
+robot.add_ability({
+	ability = 'place',
+	disabled = not minetest.get_modpath('dispenser'),
+	item = 'dispenser:dispenser',
+	act_on = 'first',
+	depends_on = 'self',
+	description = S("Place a block down"),
+	command_example = "robot.place(<dir 'up'|'front'/nil|'down'>)",
+	done_by = { head = true, body = true },
+	action = function (nodeinfo, dir)
+		local ns = nodeinfo.robot_set()
+		local actorinfo = api.any_has_ability(nodeinfo, 'place')
+		if not actorinfo then return end
 
-			if type(dir) ~= 'string' then
-				error('placing dir must be a string',2)
+		if not dir then dir = 'front' end
+
+		if type(dir) ~= 'string' then
+			error('placing dir must be a string',2)
+			return
+		end
+		if not (dir == 'up' or dir == 'front' or dir == 'down') then
+			error(("direction '%s' is invalid"):format(dir), 2)
+			return
+		end
+
+		local node = actorinfo.node()
+		local meta = actorinfo.meta()
+		local pos = actorinfo.pos()
+
+		local direction
+		local frontpos
+		if dir == 'front' then
+			direction = actorinfo.direction()
+			frontpos = actorinfo.front()
+		elseif dir == 'up' then
+			direction = {x=0,y=1,z=0}
+			frontpos = vector.add(ns[1].pos(), direction)
+		elseif dir == 'down' then
+			if not api.any_has_ability(nodeinfo, 'climb') then
+				error('requires climb ability to place block below', 2)
 				return
 			end
-			if not (dir == 'up' or dir == 'front' or dir == 'down') then
-				error(("direction '%s' is invalid"):format(dir), 2)
-				return
-			end
+			direction = {x=0,y=-1,z=0}
+			frontpos = ns[#ns].pos()
+		end
+		local owner = meta:get_string('player_name')
 
-			local node = minetest.get_node(pos)
-			local meta = minetest.get_meta(pos)
-			local inv = meta:get_inventory()
+		if minetest.is_protected(frontpos, owner) then
+			error("protected area in the way", 2)
+			return
+		end
 
-			local direction
-			if dir == 'front' then
-				direction = vector.subtract({x=0,y=0,z=0}, minetest.facedir_to_dir(node.param2))
-			elseif dir == 'up' then
-				direction = {x=0,y=1,z=0}
-			elseif dir == 'down' then
-				if not api.has_ability(meta, inv, 'climb') then
-					error('requires climb ability to place block below', 2)
-					return
-				end
-				direction = {x=0,y=0,z=0}
-			end
-			local owner = meta:get_string('player_name')
-			local frontpos = vector.add(pos, direction)
-			if minetest.is_protected(frontpos, owner) then
-				error("protected area in the way", 2)
-				return
-			end
-
-			local list = inv:get_list('main')
-			local next_stack
-			local next_index
-			for index,stack in ipairs(list) do
+		-- TODO: retrieve from any/first node in stack?
+		local inv_info
+		local next_index
+		local next_stack
+		for _,n in ipairs(ns) do
+			local list = n.inv():get_list('main')
+			for index, stack in ipairs(list) do
 				if not stack:is_empty() then
-					next_stack = stack
 					next_index = index
+					inv_info = n
+					next_stack = stack
 					break
 				end
 			end
-			if not next_stack then
-				error("inventory empty", 2)
-				return
-			end
-			local item_name = next_stack:get_name()
-			local def = minetest.registered_items[item_name]
-			if not (def and def.on_place) then
-				error("item not placable", 2)
-				return
-			end
-			local player_opts = {
-				front = frontpos,
-				dir = direction,
-				pos = pos,
-				meta = meta,
-				index = next_index
-			}
+			if inv_info then break end
+		end
+		if not inv_info then
+			error("inventory empty", 2)
+			return
+		end
 
-			local new_pos
-			local fuel_used
-			if dir == 'down' then
-				local uppos = vector.add(pos, {x=0,y=1,z=0})
+		local item_name = next_stack:get_name()
+		local def = minetest.registered_items[item_name]
+		if not (def and def.on_place) then
+			error("item not placable", 2)
+			return
+		end
+		local player_opts = {
+			front = frontpos,
+			dir = direction,
+			index = next_index
+		}
+
+		local fuel_used
+		if dir == 'down' then
+			for i, n in ipairs(ns) do
+				local uppos = vector.add(n.pos(), {x=0,y=1,z=0})
 				if minetest.is_protected(uppos, owner) then
 					error("protected area in the way", 2)
 					return
-				elseif not api.can_move_to(uppos) then
+				elseif i == 1 and not api.can_move_to(uppos) then
 					error("blocked", 2)
 					return
 				end
-				player_opts.meta = api.move_robot(node, meta, pos, uppos)
-				player_opts.pos = uppos
-				player_opts.dir = {x=0,y=-1,z=0}
-				inv = player_opts.meta:get_inventory()
-				next_stack = inv:get_stack('main', next_index)
-
-				new_pos = uppos
-				fuel_used = 2
-
 			end
-			local player = dispenser.actions.fake_player(next_stack, player_opts)
-			if not player then
-				error("player not logged in", 2)
-				return
+			for _, n in ipairs(ns) do
+				local uppos = vector.add(n.pos(), {x=0,y=1,z=0})
+				api.move_robot(n, uppos)
 			end
 
-			local result = def.on_place(next_stack, player, {
-				type="node",
-				under=frontpos,
-				above=frontpos
-			})
-			minetest.check_for_falling(frontpos)
-			if result then
-				inv:set_stack('main', next_index, result)
-			end
-			return new_pos, fuel_used
+			fuel_used = 2
 		end
-	})
-end
+
+		player_opts.pos = actorinfo.pos()
+		player_opts.meta = inv_info.meta()
+
+		next_stack = inv_info.inv():get_stack('main', next_index)
+		local player = dispenser.actions.fake_player(next_stack, player_opts)
+		if not player then
+			error("player not logged in", 2)
+			return
+		end
+
+		local result = def.on_place(next_stack, player, {
+			type="node",
+			under=frontpos,
+			above=frontpos
+		})
+		minetest.check_for_falling(frontpos)
+		if result then
+			inv_info.inv():set_stack('main', next_index, result)
+		end
+		return nil, fuel_used
+	end
+})
 
 
-local use_ability_item
-if minetest.get_modpath('bones') then
-	use_ability_item = "bones:bones"
-end
-if use_ability_item and minetest.get_modpath('dispenser') then
-	robot.add_ability({
-		ability = "use",
-		item = use_ability_item,
-		description = S("Use an item (not a tool)"),
-		done_by = { head = true, body = true },
-		action = function (pos)
-			local node = minetest.get_node(pos)
 
-			local direction = vector.subtract({x=0,y=0,z=0}, minetest.facedir_to_dir(node.param2))
-			local frontpos = vector.add(pos, direction)
+robot.add_ability({
+	ability = 'use',
+	disabled = not minetest.get_modpath('dispenser'),
+	item = function ()
+		if minetest.get_modpath('bones') then
+			return "bones:bones"
+		end
+	end,
+	act_on = 'first',
+	depends_on = 'self',
+	description = S("Use an item (not a tool)"),
+	done_by = { head = true, body = true },
+	action = function (nodeinfo)
+		local actorinfo = api.any_has_ability(nodeinfo, 'use')
+		if not actorinfo then return end
 
-			local meta = minetest.get_meta(pos)
-			local inv = meta:get_inventory()
-			local list = inv:get_list('main')
-			local next_stack
-			local next_index
+		local inv_info
+		local next_stack
+		local next_index
+		local frontpos = actorinfo.front()
+		for _,n in ipairs(nodeinfo.robot_set()) do
+			local node_inv = n.inv()
+			local list = node_inv:get_list('main')
 			for index,stack in ipairs(list) do
 				if not stack:is_empty() then
 					next_stack = stack
 					next_index = index
+					inv_info = n
 					break
 				end
 			end
-			if not next_stack then
-				error("inventory empty", 2)
-				return
-			end
-
-			local item_name = next_stack:get_name()
-			local def = minetest.registered_items[item_name]
-			if not (def and def.on_use) then
-				error("item not usable", 2)
-				return
-			end
-			local player = dispenser.actions.fake_player(next_stack, {
-				front = frontpos,
-				dir = direction,
-				pos = pos,
-				meta = meta,
-				index = next_index
-			})
-			if not player then
-				error("player not logged in", 2)
-				return
-			end
-			local result = def.on_use(next_stack, player, {
-				type="node",
-				under=frontpos,
-				above=vector.add(frontpos, {x=0,y=1,z=0})
-			})
-			if result then
-				inv:set_stack('main', next_index, result)
-			end
+			if inv_info then break end
 		end
-	})
-end
-
-
-local switch_ability_item
-if minetest.get_modpath('tubelib') then
-	switch_ability_item = 'tubelib:button'
-end
-if switch_ability_item and minetest.get_modpath('tubelib') then
-	robot.add_ability({
-		ability = 'switch',
-		item = switch_ability_item,
-		description = S("Switch a tubelib machine on and off"),
-		done_by = { head = true, body = true },
-		action = function (pos)
-			local node = minetest.get_node(pos)
-
-			local direction = vector.subtract({x=0,y=0,z=0}, minetest.facedir_to_dir(node.param2))
-			local frontpos = vector.add(pos, direction)
-
-			local tube_meta = minetest.get_meta(frontpos)
-
-			local state = tube_meta:get_int("tubelib_state")
-			local number = tubelib.get_node_number(frontpos)
-
-			if not state or not number or number == "" then return end
-
-			local meta = minetest.get_meta(pos)
-			local owner = meta:get_string('player_name')
-
-			tubelib.send_message(number, owner, nil, state == tubelib.STOPPED and "on" or "off", nil)
+		if not next_stack then
+			error("inventory empty", 2)
+			return
 		end
-	})
-end
+
+		local item_name = next_stack:get_name()
+		local def = minetest.registered_items[item_name]
+		if not (def and def.on_use) then
+			error("item not usable", 2)
+			return
+		end
+		local player = dispenser.actions.fake_player(next_stack, {
+			front = frontpos,
+			dir = actorinfo.direction(),
+			pos = actorinfo.pos(),
+			meta = inv_info.meta(),
+			index = next_index
+		})
+		if not player then
+			error("player not logged in", 2)
+			return
+		end
+		local result = def.on_use(next_stack, player, {
+			type="node",
+			under=frontpos,
+			above=vector.add(frontpos, {x=0,y=1,z=0})
+		})
+		if result then
+			inv_info.inv():set_stack('main', next_index, result)
+		end
+	end
+})
 
 
-local push_ability_item
-if minetest.get_modpath('mesecons_movestones') then
-	push_ability_item = "mesecons_movestones:movestone"
-end
-if push_ability_item and minetest.get_modpath('mesecons_mvps') then
-	robot.add_ability({
-		ability = 'push',
-		item = push_ability_item,
-		done_by = { legs = true, body = true },
-		description = S("Push a block when moving forwards")
-	})
-end
+
+robot.add_ability({
+	ability = 'switch',
+	disabled = not minetest.get_modpath('tubelib'),
+	item = function ()
+		if minetest.get_modpath('tubelib') then
+			return 'tubelib:button'
+		end
+	end,
+	act_on = 'first',
+	depends_on = 'self',
+	description = S("Switch a tubelib machine on and off"),
+	done_by = { head = true, body = true },
+	action = function (nodeinfo)
+		local actorinfo = api.any_has_ability(nodeinfo, 'switch')
+		if not actorinfo then return end
+
+		local frontpos = actorinfo.front()
+
+		local tube_meta = minetest.get_meta(frontpos)
+
+		local state = tube_meta:get_int("tubelib_state")
+		local number = tubelib.get_node_number(frontpos)
+
+		if not state or not number or number == "" then return end
+
+		local meta = actorinfo.meta()
+		local owner = meta:get_string('player_name')
+
+		tubelib.send_message(number, owner, nil, state == tubelib.STOPPED and "on" or "off", nil)
+	end
+})
 
 
-local carry_ability_item
-if minetest.get_modpath('hook') then
-	carry_ability_item = 'hook:pchest'
-elseif minetest.get_modpath('unified_inventory') then
-	carry_ability_item = 'unified_inventory:bag_large'
-elseif minetest.get_modpath('default') then
-	carry_ability_item = 'default:chest'
-end
-if carry_ability_item then
-	robot.add_ability({
-		ability = "carry",
-		item = carry_ability_item,
-		description = S("Expand the item inventory"),
-		done_by = { legs = true, body = true },
-		modifier = function(pos, player_name)
-			local meta = minetest.get_meta(pos)
-			local inv = meta:get_inventory()
-			inv:set_size('main', 16)
-		end,
-		un_modifier = function(pos, player_name)
-			local meta = minetest.get_meta(pos)
-			local inv = meta:get_inventory()
 
-			-- Spit out any extra items
-			local list = inv:get_list('main')
-			for i,stack in ipairs(list) do
-				if i > 1 then
-					minetest.add_item(vector.add(pos, {x=0,y=0.5,z=0}), stack)
+robot.add_ability({
+	ability = 'push',
+	disabled = not minetest.get_modpath('mesecons_mvps'),
+	item = function ()
+		if minetest.get_modpath('mesecons_movestones') then
+			return "mesecons_movestones:movestone"
+		end
+	end,
+	act_on = 'all',
+	depends_on = 'any',
+	done_by = { legs = true, body = true },
+	description = S("Push a block when moving forwards")
+})
+
+
+
+robot.add_ability({
+	ability = 'carry',
+	item = function ()
+		if minetest.get_modpath('hook') then
+			return 'hook:pchest'
+		elseif minetest.get_modpath('unified_inventory') then
+			return 'unified_inventory:bag_large'
+		elseif minetest.get_modpath('default') then
+			return 'default:chest'
+		end
+	end,
+	act_on = 'self',
+	depends_on = 'self',
+	description = S("Expand the item inventory"),
+	done_by = { legs = true, body = true },
+	updates_formspec = true,
+	modifier = function(nodeinfo, player_name)
+		local info = nodeinfo.info()
+		local inv = nodeinfo.inv()
+
+		local new_size = api.tiers[info.tier].form_size*2
+		if api.has_ability(nodeinfo, 'fuel_swap') then
+			new_size = new_size - 4
+			inv:set_size('fuel', inv:get_size('fuel') + 3)
+		end
+		inv:set_size('main', new_size)
+	end,
+	un_modifier = function(nodeinfo, player_name)
+		local info = nodeinfo.info()
+		local inv = nodeinfo.inv()
+
+		local new_size = api.tiers[info.tier].inventory_size
+		if api.has_ability(nodeinfo, 'fuel_swap') then
+			new_size = new_size - 1
+			local new_fuel_size = inv:get_size('fuel') - 3
+
+			local fuel_list = inv:get_list('fuel')
+			for i,stack in ipairs(fuel_list) do
+				if i > new_fuel_size then
+					minetest.add_item(vector.add(nodeinfo.pos(), {x=0,y=0.5,z=0}), stack)
 				end
 			end
-
-			inv:set_size('main', 1)
-		end,
-	})
-end
-
-
-local fuel_ability_item
-if minetest.get_modpath('unified_inventory') then
-	fuel_ability_item = 'unified_inventory:bag_small'
-elseif minetest.get_modpath('default') then
-	fuel_ability_item = 'default:furnace'
-end
-if fuel_ability_item then
-	robot.add_ability({
-		ability = "fuel",
-		item = fuel_ability_item,
-		description = S("Expand the fuel inventory"),
-		done_by = { head = true, legs = true, body = true },
-		modifier = function(pos, player_name)
-			local meta = minetest.get_meta(pos)
-			local inv = meta:get_inventory()
-			inv:set_size('fuel', 4)
-			api.update_formspec(pos, meta)
-
-			if api.formspec_data[player_name]
-				and api.formspec_data[player_name].psuedo_metadata
-			then
-				api.update_formspec(pos, meta)
-				minetest.show_formspec(player_name, 'robot_inventory', meta:get_string('formspec'))
-			end
-		end,
-		un_modifier = function(pos, player_name)
-			local meta = minetest.get_meta(pos)
-			local inv = meta:get_inventory()
-
-			-- Spit out any extra items
-			local list = inv:get_list('fuel')
-			for i,stack in ipairs(list) do
-				if i > 1 then
-					minetest.add_item(vector.add(pos, {x=0,y=0.5,z=0}), stack)
-				end
-			end
-
-			inv:set_size('fuel', 1)
-			api.update_formspec(pos, meta)
-
-			if api.formspec_data[player_name]
-				and api.formspec_data[player_name].psuedo_metadata
-			then
-				api.update_formspec(pos, meta)
-				minetest.show_formspec(player_name, 'robot_inventory', meta:get_string('formspec'))
-			end
-		end,
-	})
-end
-
-
-local fill_ability_item
-if minetest.get_modpath('tubelib') then
-	fill_ability_item = 'tubelib:tubeS'
-end
-if fill_ability_item and minetest.get_modpath('tubelib') then
-	robot.add_ability({
-		ability = 'fill',
-		item = fill_ability_item,
-		done_by = { legs = true, body = true },
-		description = S("Fill and empty the inventory using pushers"),
-	})
-end
-
-
-
-local speed_ability_item
-if minetest.get_modpath('terumet') then
-	speed_ability_item = 'terumet:item_upg_speed_up'
-elseif minetest.get_modpath('carts') then
-	speed_ability_item = 'carts:powerrail'
-end
-if speed_ability_item then
-	robot.add_ability({
-		ability = 'speed',
-		item = speed_ability_item,
-		description = S("Make the robot run twice as fast"),
-		done_by = { legs = true, head = true },
-		modifier = function (pos)
-			local node = minetest.get_node(pos)
-			node.param1 = 1
-			minetest.swap_node(pos, node)
-		end,
-		un_modifier = function (pos)
-			local node = minetest.get_node(pos)
-			node.param1 = 0
-			minetest.swap_node(pos, node)
+			inv:set_size('fuel', new_fuel_size)
 		end
-	})
-end
+		-- Spit out any extra items
+		local list = inv:get_list('main')
+		for i,stack in ipairs(list) do
+			if i > new_size then
+				minetest.add_item(vector.add(nodeinfo.pos(), {x=0,y=0.5,z=0}), stack)
+			end
+		end
+
+		inv:set_size('main', new_size)
+	end,
+})
+
+
+
+robot.add_ability({
+	ability = 'fuel',
+	item = function ()
+		if minetest.get_modpath('unified_inventory') then
+			return 'unified_inventory:bag_small'
+		elseif minetest.get_modpath('default') then
+			return 'default:furnace'
+		end
+	end,
+	act_on = 'self',
+	depends_on = 'self',
+	description = S("Expand the fuel inventory"),
+	done_by = { head = true, legs = true, body = true },
+	updates_formspec = true,
+	modifier = function(nodeinfo, player_name)
+		local inv = nodeinfo.inv()
+		inv:set_size('fuel', inv:get_size('fuel')+3)
+	end,
+	un_modifier = function(nodeinfo, player_name)
+		local inv = nodeinfo.inv()
+
+		-- Spit out any extra items
+		local list = inv:get_list('fuel')
+		local new_size = inv:get_size('fuel')-3
+		for i,stack in ipairs(list) do
+			if i > new_size then
+				minetest.add_item(vector.add(nodeinfo.pos(), {x=0,y=0.5,z=0}), stack)
+			end
+		end
+
+		inv:set_size('fuel', new_size)
+	end,
+})
+
+
+
+robot.add_ability({
+	ability = 'fill',
+	disabled = not minetest.get_modpath('tubelib'),
+	item = function ()
+		local fill_ability_item
+		if minetest.get_modpath('tubelib') then
+			return 'tubelib:tubeS'
+		end
+	end,
+	act_on = 'self',
+	depends_on = 'self',
+	done_by = { legs = true, body = true },
+	description = S("Fill and empty the inventory using pushers"),
+})
+
+
+
+
+robot.add_ability({
+	ability = 'speed',
+	item = function ()
+		if minetest.get_modpath('terumet') then
+			return 'terumet:item_upg_speed_up'
+		elseif minetest.get_modpath('carts') then
+			return 'carts:powerrail'
+		end
+	end,
+	act_on = 'all',
+	depends_on = 'any',
+	description = S("Make the robot run twice as fast"),
+	done_by = { legs = true },
+	modifier = function (nodeinfo)
+		if not nodeinfo.speed_enabled() then
+			nodeinfo.set_node({ param1 = nodeinfo.node().param1 + 1 })
+		end
+	end,
+	un_modifier = function (nodeinfo)
+		if nodeinfo.speed_enabled() then
+			nodeinfo.set_node({ param1 = nodeinfo.node().param1 - 1 })
+		end
+	end
+})
+robot.add_ability({
+	ability = 'connectivity',
+	item = function ()
+		return "digistuff:insulated_straight"
+	end,
+	act_on = 'self',
+	depends_on = 'self',
+	description = S("Connect to robot parts above"),
+	done_by = { legs = true, body = true },
+	updates_formspec = true,
+	modifier = function (nodeinfo)
+		api.correct_connection(nodeinfo)
+	end,
+	un_modifier = function (nodeinfo)
+		api.correct_connection(nodeinfo)
+	end,
+})
+
+
+robot.add_ability({
+	interface_enabled = true,
+	ability = "fuel_swap",
+	item = function ()
+		return "default:acacia_leaves"
+	end,
+	act_on = 'self',
+	depends_on = 'self',
+	description = S("Swap some normal inventory for fuel inventory"),
+	done_by = { legs = true, body = true, head = true },
+	updates_formspec = true,
+	modifier = function(nodeinfo, player_name)
+		local inv = nodeinfo.inv()
+		local size_change = 1
+		if api.has_ability(nodeinfo, 'carry') then
+			size_change = size_change + 3
+		end
+
+		inv:set_size('fuel', inv:get_size('fuel')+size_change)
+
+		-- Spit out any extra items
+		local list = inv:get_list('main')
+		local new_size = inv:get_size('main')-size_change
+		for i,stack in ipairs(list) do
+			if i > new_size then
+				minetest.add_item(vector.add(nodeinfo.pos(), {x=0,y=0.5,z=0}), stack)
+			end
+		end
+	end,
+	un_modifier = function(nodeinfo, player_name)
+		local inv = nodeinfo.inv()
+		local size_change = 1
+		if api.has_ability(nodeinfo, 'carry') then
+			size_change = size_change + 3
+		end
+
+		inv:set_size('main', inv:get_size('main')+size_change)
+
+		-- Spit out any extra items
+		local list = inv:get_list('fuel')
+		local new_size = inv:get_size('fuel')-size_change
+		for i,stack in ipairs(list) do
+			if i > new_size then
+				minetest.add_item(vector.add(nodeinfo.pos(), {x=0,y=0.5,z=0}), stack)
+			end
+		end
+	end,
+})
+robot.add_ability({
+	interface_enabled = true,
+	ability = "boost",
+	item = function ()
+		return "default:blueberry_bush_leaves"
+	end,
+	act_on = 'all',
+	depends_on = 'any',
+	description = S("Speed up but use more fuel randomly"),
+	done_by = { legs = true, body = true, head = true },
+	modifier = function (nodeinfo)
+		if not nodeinfo.boost_enabled() then
+			nodeinfo.set_node({ param1 = nodeinfo.node().param1 + 2 })
+		end
+	end,
+	un_modifier = function (nodeinfo)
+		if nodeinfo.boost_enabled() then
+			nodeinfo.set_node({ param1 = nodeinfo.node().param1 - 2 })
+		end
+	end
+})
 
 --[[
 programibility
@@ -677,12 +894,12 @@ legs = {
 ]]
 
 
-function api.stop_action (pos)
-	api.set_status(pos, minetest.get_meta(pos), 'stopped')
+function api.stop_action (nodeinfo)
+	api.set_status(nodeinfo, 'stopped')
 	return nil, 0
 end
-function api.log_action (pos,...)
-	local meta = minetest.get_meta(pos)
+function api.log_action (nodeinfo,...)
+	local meta = nodeinfo.meta()
 	local owner = meta:get_string('player_name')
 	minetest.chat_send_player(owner, "[robot] LOG: "..dump({...}))
 	return nil, 0
