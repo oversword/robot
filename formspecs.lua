@@ -82,7 +82,8 @@ function api.formspecs.inventory(nodeinfo)
 				ability_obj.item,
 				ability,ability,
 				minetest.formspec_escape(ability_obj.description)
-			)..(extras_enabled[ability] and "" or ("item_image[%i,2;1,1;%s]"):format(2+#extra_abilities, api.config.ability_item)))
+			)..(extras_enabled[ability] and ("item_image[%i,2;1,1;%s]"):format(2+#extra_abilities, "moretrees:coconut_1") or ""))
+			-- item_image[%i,%i;1,1;%s]
 		end
 	end
 

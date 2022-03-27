@@ -279,7 +279,7 @@ local function after_construct(pos)
 	if old_pos_str ~= "" then
 		local old_pos = minetest.string_to_pos(old_pos_str)
 		local diff = vector.subtract(old_pos, pos)
-		if diff.y > api.config.max_fall then
+		if diff.y > api.tiers[nodeinfo.info().tier].max_fall then
 			api.set_status(nodeinfo, 'broken')
 			meta:set_string('error', S("Ouch: internal damage"))
 		end

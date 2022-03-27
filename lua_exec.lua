@@ -282,7 +282,8 @@ local function run_inner(nodeinfo)
 			args = {}
 		}
 	end
-	local logs = {}
+	
+	-- local logs = {}
 	-- commands.log = function (...)
 	-- 	local lg = {}
 	-- 	for i,v in ipairs({...}) do

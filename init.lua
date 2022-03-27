@@ -239,7 +239,6 @@ end
 -- TODO: settings
 api.config.max_push = 1--mesecon.setting("movestone_max_push", 50)
 api.config.step_delay = 2
-api.config.max_fall = 10
 
 api.dofile('helpers')
 api.dofile('abilities')

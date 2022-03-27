@@ -8,7 +8,10 @@ api.abilities_ability_index = {}
 
 minetest.register_craftitem(api.config.god_item, {
 	description = "God Ability",
-	inventory_image = 'robot_god_ability_item.png'
+	inventory_image = 'robot_god_ability_item.png',
+	groups = {
+		not_in_creative_inventory = 1
+	}
 })
 
 function robot.add_ability(ability_obj)
@@ -148,7 +151,6 @@ function api.can_have_ability(nodeinfo, ability_name)
 end
 
 function api.apply_ability(nodeinfo, player_name, ability)
-	-- minetest.log("error", "apply "..ability.ability)
 	if ability.modifier then
 		if not ability.un_modifier then
 			minetest.log("error", "[robot] Ability modifier will not run unless it has an un-modfier method.")
@@ -173,6 +175,7 @@ robot.add_ability({
 		elseif minetest.get_modpath('screwdriver') then
 		 return 'screwdriver:screwdriver'
 		end
+		return "default:acacia_bush_leaves"
 	end,
 	description = S("Rotate the robot 90 degrees"),
 	command_example = "robot.turn(<anticlockwise? true|false/nil>)",
@@ -199,6 +202,7 @@ robot.add_ability({
 		if minetest.get_modpath('carts') then
 			return "carts:cart"
 		end
+		return "default:acacia_bush_sapling"
 	end,
 	description = S("Move one block forwards"),
 	done_by = { head = true, legs = true },
@@ -276,6 +280,7 @@ robot.add_ability({
 		if minetest.get_modpath('mesecons_pistons') then
 			return 'mesecons_pistons:piston_normal_off'
 		end
+		return "default:acacia_bush_stem"
 	end,
 	description = S("Climb up and forwards one block"),
 	done_by = { head = true, legs = true },
@@ -322,6 +327,7 @@ robot.add_ability({
 		elseif minetest.get_modpath('binoculars') then
 			return "binoculars:binoculars"
 		end
+		return "default:acacia_leaves"
 	end,
 	description = S("Get the name of the node in front of the robot"),
 	command_example = "node_name = robot.look()",
@@ -346,6 +352,7 @@ robot.add_ability({
 		elseif minetest.get_modpath('map') then
 			return 'map:mapping_kit'
 		end
+		return "default:acacia_sapling"
 	end,
 	act_on = 'last',
 	depends_on = 'any',
@@ -417,7 +424,6 @@ robot.add_ability({
 			return
 		end
 
-		-- TODO: retrieve from any/first node in stack?
 		local inv_info
 		local next_index
 		local next_stack
@@ -502,6 +508,7 @@ robot.add_ability({
 		if minetest.get_modpath('bones') then
 			return "bones:bones"
 		end
+		return "default:acacia_tree"
 	end,
 	act_on = 'first',
 	depends_on = 'self',
@@ -570,6 +577,7 @@ robot.add_ability({
 		if minetest.get_modpath('tubelib') then
 			return 'tubelib:button'
 		end
+		return "default:acacia_wood"
 	end,
 	act_on = 'first',
 	depends_on = 'self',
@@ -604,6 +612,7 @@ robot.add_ability({
 		if minetest.get_modpath('mesecons_movestones') then
 			return "mesecons_movestones:movestone"
 		end
+		return "default:apple"
 	end,
 	act_on = 'all',
 	depends_on = 'any',
@@ -616,13 +625,16 @@ robot.add_ability({
 robot.add_ability({
 	ability = 'carry',
 	item = function ()
-		if minetest.get_modpath('hook') then
+		--[[if minetest.get_modpath('hook') then
 			return 'hook:pchest'
-		elseif minetest.get_modpath('unified_inventory') then
+		else
+		]]
+		if minetest.get_modpath('unified_inventory') then
 			return 'unified_inventory:bag_large'
 		elseif minetest.get_modpath('default') then
 			return 'default:chest'
 		end
+		return "default:aspen_leaves"
 	end,
 	act_on = 'self',
 	depends_on = 'self',
@@ -679,6 +691,7 @@ robot.add_ability({
 		elseif minetest.get_modpath('default') then
 			return 'default:furnace'
 		end
+		return "default:aspen_sapling"
 	end,
 	act_on = 'self',
 	depends_on = 'self',
@@ -715,6 +728,7 @@ robot.add_ability({
 		if minetest.get_modpath('tubelib') then
 			return 'tubelib:tubeS'
 		end
+		return "default:aspen_tree"
 	end,
 	act_on = 'self',
 	depends_on = 'self',
@@ -733,6 +747,7 @@ robot.add_ability({
 		elseif minetest.get_modpath('carts') then
 			return 'carts:powerrail'
 		end
+		return "default:aspen_wood"
 	end,
 	act_on = 'all',
 	depends_on = 'any',
@@ -772,7 +787,10 @@ robot.add_ability({
 	interface_enabled = true,
 	ability = "fuel_swap",
 	item = function ()
-		return "default:acacia_leaves"
+		if minetest.get_modpath('replacer') then
+			return "replacer:replacer"
+		end
+		return "default:blueberries"
 	end,
 	act_on = 'self',
 	depends_on = 'self',
@@ -796,6 +814,7 @@ robot.add_ability({
 				minetest.add_item(vector.add(nodeinfo.pos(), {x=0,y=0.5,z=0}), stack)
 			end
 		end
+		inv:set_size('main', new_size)
 	end,
 	un_modifier = function(nodeinfo, player_name)
 		local inv = nodeinfo.inv()
@@ -814,12 +833,16 @@ robot.add_ability({
 				minetest.add_item(vector.add(nodeinfo.pos(), {x=0,y=0.5,z=0}), stack)
 			end
 		end
+		inv:set_size('fuel', new_size)
 	end,
 })
 robot.add_ability({
 	interface_enabled = true,
 	ability = "boost",
 	item = function ()
+		if minetest.get_modpath('orienteering') then
+			return "orienteering:speedometer"
+		end
 		return "default:blueberry_bush_leaves"
 	end,
 	act_on = 'all',
@@ -837,61 +860,6 @@ robot.add_ability({
 		end
 	end
 })
-
---[[
-programibility
-digilines programability?
-connectivity
-
-tiers = {
-	man = {
-		delay = 2,
-		ability_slots = 5,
-		inventory_size = 1,
-		form_size = 8,
-	},
-	devil = {
-		delay = 3,
-		ability_slots = 6,
-		inventory_size = 2,
-		form_size = 9,
-		extra_abilities = {
-			{
-				name = "boost",
-				description = "Speed up but use more fuel randomly",
-			},
-		}
-	},
-	god = {
-		delay = 4,
-		ability_slots = 7,
-		inventory_size = 4,
-		form_size = 10,
-		extra_abilities = {
-			{
-				name = "fuel_swap",
-				description = "Swap some normal inventory for fuel inventory",
-			},
-			{
-				name = "boost",
-				description = "Speed up but use more fuel randomly",
-			},
-		}
-	},
-}
-
-head = {
-},
-body = {
-	connects_above = {head=true},
-	default_abilities = {carry=true,fuel=true}
-},
-legs = {
-	connects_above = {head=true,body=true},
-	default_abilities = {move=true,turn=true}
-}
-
-]]
 
 
 function api.stop_action (nodeinfo)

@@ -77,82 +77,211 @@ local function on_timer (pos, dtime)
 	return true
 end
 
-local tiles = {
-	top = 'robot_top.png',
-	bottom = 'robot_bottom.png',
-	side = {
-		stopped = 'robot_side.png',
-		running = {
-			name = 'robot_side_running.png',
-			animation = {
-			type = "vertical_frames",
-				aspect_w = 8,
-				aspect_h = 8,
-				length = 1,
-			}
-		},
-		error = {
-			name = 'robot_side_error.png',
-			animation = {
-			type = "vertical_frames",
-				aspect_w = 8,
-				aspect_h = 8,
-				length = 1,
-			}
-		},
-		broken = 'robot_side_broken.png'
+local anim_texture = function (image, dur)
+	return {
+		name = image,
+		animation = {
+		type = "vertical_frames",
+			aspect_w = 8,
+			aspect_h = 8,
+			length = dur,
+		}
+	}
+end
+
+local devil_tiles = {
+	top = 'robot_dark_top.png',
+	front = {
+		stopped = 'robot_dark_front.png',
+		running = 'robot_dark_front_running.png',
+		error = 'robot_dark_front_error.png',
+		broken = 'robot_dark_front_broken.png',
+	},
+	front_body = {
+		stopped = 'robot_dark_body_front.png',
+		running = anim_texture('robot_dark_body_front_running.png', 1),
+		error = 'robot_dark_body_front.png',
+		broken = 'robot_dark_body_front_broken.png',
+	},
+	front_legs = {
+		stopped = anim_texture('robot_dark_legs_front.png', 1),
+		running = anim_texture('robot_dark_legs_front_running.png', 0.5),
+		error = anim_texture('robot_dark_legs_front.png', 1),
+		broken = 'robot_dark_legs_front_broken.png',
 	},
 	back = {
-		stopped = 'robot_back.png',
-		running = 'robot_back_running.png',
-		error = 'robot_back_error.png',
-		broken = 'robot_back_error.png',
+		stopped = 'robot_dark_back.png',
+		running = anim_texture('robot_dark_back_running.png', 1),
+		error = anim_texture('robot_dark_back_error.png', 1),
+		broken = 'robot_dark_back_broken.png',
+	},
+	side = {
+		stopped = 'robot_dark_side.png',
+		running = anim_texture('robot_dark_side_running.png', 1),
+		error = anim_texture('robot_dark_side_error.png', 1),
+		broken = 'robot_dark_side_broken.png',
+	},
+	side_flipped = {
+		stopped = 'robot_dark_side.png^[transform4',
+		running = anim_texture('robot_dark_side_running.png^[transform4', 1),
+		error = anim_texture('robot_dark_side_error.png^[transform4', 1),
+		broken = 'robot_dark_side_broken.png^[transform4',
+	},
+}
+local god_tiles = {
+	top = 'robot_light_top.png',
+	front = {
+		stopped = 'robot_light_front.png',
+		running = 'robot_light_front_running.png',
+		error = 'robot_light_front_error.png',
+		broken = 'robot_light_front_broken.png',
+	},
+	side = {
+		stopped = anim_texture('robot_light_side.png', 2),
+		running = 'robot_light_top.png',
+		error = anim_texture('robot_light_side_error.png', 0.8),
+		broken = anim_texture('robot_light_side_broken.png',  0.8),
+	},
+	side_legs = {
+		stopped = anim_texture('robot_light_legs_side.png', 2),
+		running = anim_texture('robot_light_legs_side_running.png', 0.8),
+		error = anim_texture('robot_light_legs_side_error.png', 0.8),
+		broken = anim_texture('robot_light_legs_side_broken.png', 0.8),
+	}
+}
+local man_tiles = {
+	top = 'robot_norm_top.png',
+	top_connectable = 'robot_norm_top_connectable.png',
+	bottom = 'robot_norm_bottom.png',
+	bottom_legs = 'robot_norm_legs_bottom.png',
+	front_legs = 'robot_norm_legs_front.png',
+	side_body = 'robot_norm_body_side.png',
+	side = {
+		stopped = 'robot_norm_side.png',
+		running = anim_texture('robot_norm_side_running.png', 1),
+		error = anim_texture('robot_norm_side_error.png', 1),
+		broken = 'robot_norm_side_broken.png'
+	},
+	side_legs = {
+		stopped = 'robot_norm_legs_side.png',
+		running = anim_texture('robot_norm_legs_side_running.png', 1),
+		error = anim_texture('robot_norm_legs_side_error.png', 1),
+		broken = 'robot_norm_legs_side_broken.png'
+	},
+	front_body = {
+		stopped = 'robot_norm_body_front.png',
+		running = anim_texture('robot_norm_body_front_running.png', 1),
+		error = anim_texture('robot_norm_body_front_error.png', 1),
+		broken = 'robot_norm_body_front_broken.png'
+	},
+	back = {
+		stopped = 'robot_norm_back.png',
+		running = 'robot_norm_back_running.png',
+		error = 'robot_norm_back_error.png',
+		broken = 'robot_norm_back_error.png',
 	},
 	front = {
-		stopped = 'robot_front.png',
-		running = 'robot_front_running.png',
-		error = 'robot_front_error.png',
-		broken = 'robot_front_broken.png',
+		stopped = 'robot_norm_front.png',
+		running = 'robot_norm_front_running.png',
+		error = 'robot_norm_front_error.png',
+		broken = 'robot_norm_front_broken.png',
 	}
 }
 
 api.parts = {
 	head = {
+		description = S("Head"),
 		name_postfix = "",
 		tiles = {
 			-- up, down, right, left, back, front
-			tiles.top,
-			tiles.bottom,
-			tiles.side,
-			tiles.side,
-			tiles.back,
-			tiles.front,
+			man = {
+				man_tiles.top,
+				man_tiles.bottom,
+				man_tiles.side,
+				man_tiles.side,
+				man_tiles.back,
+				man_tiles.front,
+			},
+			devil = {
+				devil_tiles.top,
+				devil_tiles.top,
+				devil_tiles.side,
+				devil_tiles.side_flipped,
+				devil_tiles.back,
+				devil_tiles.front,
+			},
+			god = {
+				god_tiles.side,
+				god_tiles.top,
+				god_tiles.side,
+				god_tiles.side,
+				god_tiles.side,
+				god_tiles.front,
+			}
 		}
 	},
 	body = {
+		description = S("Body"),
 		name_postfix = "_body",
 		tiles = {
 			-- up, down, right, left, back, front
-			tiles.top,
-			tiles.bottom,
-			tiles.side,
-			tiles.side,
-			tiles.back,
-			tiles.top,
+			man = {
+				man_tiles.top_connectable,
+				man_tiles.top,
+				man_tiles.side_body,
+				man_tiles.side_body,
+				man_tiles.side,
+				man_tiles.front_body,
+			},
+			devil = {
+				devil_tiles.top,
+				devil_tiles.top,
+				devil_tiles.back,
+				devil_tiles.back,
+				devil_tiles.top,
+				devil_tiles.front_body,
+			},
+			god = {
+				god_tiles.side,
+				god_tiles.top,
+				god_tiles.side,
+				god_tiles.side,
+				god_tiles.side,
+				god_tiles.side,
+			},
 		},
 		connects_above = {head=true},
 		default_abilities = {"carry","fuel"}
 	},
 	legs = {
+		description = S("Legs"),
 		name_postfix = "_legs",
 		tiles = {
 			-- up, down, right, left, back, front
-			tiles.top,
-			tiles.bottom,
-			tiles.bottom,
-			tiles.bottom,
-			tiles.side,
-			tiles.top,
+			man = {
+				man_tiles.top_connectable,
+				man_tiles.bottom_legs,
+				man_tiles.side_legs,
+				man_tiles.side_legs,
+				man_tiles.front_legs,
+				man_tiles.front_legs,
+			},
+			devil = {
+				devil_tiles.top,
+				devil_tiles.top,
+				devil_tiles.front_legs,
+				devil_tiles.front_legs,
+				devil_tiles.front_legs,
+				devil_tiles.front_legs,
+			},
+			god = {
+				god_tiles.side,
+				god_tiles.top,
+				god_tiles.side_legs,
+				god_tiles.side_legs,
+				god_tiles.side_legs,
+				god_tiles.side_legs,
+			},
 		},
 		connects_above = {head=true,body=true},
 		default_abilities = {"move","turn"}
@@ -161,56 +290,44 @@ api.parts = {
 
 api.tiers = {
 	man = {
-		name_prefix = "",
-		tile_postfix = "",
+		name_prefix = "norm_",
 		delay = 2,
 		ability_slots = 5,
 		inventory_size = 1,
 		form_size = 8,
+		max_fall = 10,
 	},
 	devil = {
 		name_prefix = "dark_",
-		tile_postfix = "^[colorize:#000000:200",
 		delay = 3,
 		ability_slots = 6,
 		inventory_size = 2,
 		form_size = 9,
+		max_fall = 13,
 		extra_abilities = {
 			"boost",
 		}
 	},
 	god = {
 		name_prefix = "light_",
-		tile_postfix = "^[colorize:#FFFFFF:166",
 		delay = 4,
 		ability_slots = 7,
 		inventory_size = 4,
 		form_size = 10,
+		max_fall = 16,
 		extra_abilities = {
 			"fuel_swap",
 			"boost",
 		}
 	}
 }
-local function get_tiles(tile_set, postfix, state)
+local function get_tiles(tile_set, state)
 	local ret = {}
 	for i,tile in ipairs(tile_set) do
 		if type(tile) == 'string' then
-			ret[i] = tile..postfix
+			ret[i] = tile
 		elseif tile[state] then
-			if type(tile[state]) == 'string' then
-				ret[i] = tile[state] .. postfix
-			elseif type(tile[state].name) == 'string' then
-				local r = table.copy(tile[state])
-				r.name = r.name .. postfix
-				ret[i] = r
-			else
-				ret[i] = tile[state]
-			end
-		elseif type(tile.name) == 'string' then
-			local r = table.copy(tile)
-			r.name = r.name .. postfix
-			ret[i] = r
+			ret[i] = tile[state]
 		else
 			ret[i] = tile
 		end
@@ -251,29 +368,35 @@ function api.robot_def(name)
 end
 
 for tier,tier_def in pairs(api.tiers) do
+local tier_props = table.copy(api.basic_node)
 
 for part,part_def in pairs(api.parts) do
+local part_props = table.copy(tier_props)
 
-local stopped_props = table.copy(api.basic_node)
-stopped_props.tiles = get_tiles(part_def.tiles, tier_def.tile_postfix, 'stopped')
+if part_def.description then
+	part_props.description = part_props.description .. " ("..part_def.description..")"
+end
+
+local stopped_props = table.copy(part_props)
+stopped_props.tiles = get_tiles(part_def.tiles[tier], 'stopped')
 minetest.register_node(gen_robot_name(tier, part, 'stopped'), stopped_props)
 
 
-local running_props = table.copy(api.basic_node)
-running_props.tiles = get_tiles(part_def.tiles, tier_def.tile_postfix, 'running')
+local running_props = table.copy(part_props)
+running_props.tiles = get_tiles(part_def.tiles[tier], 'running')
 running_props.groups.not_in_creative_inventory = 1
 running_props.on_timer = on_timer
 minetest.register_node(gen_robot_name(tier, part, 'running'), running_props)
 
 
-local error_props = table.copy(api.basic_node)
-error_props.tiles = get_tiles(part_def.tiles, tier_def.tile_postfix, 'error')
+local error_props = table.copy(part_props)
+error_props.tiles = get_tiles(part_def.tiles[tier], 'error')
 error_props.groups.not_in_creative_inventory = 1
 minetest.register_node(gen_robot_name(tier, part, 'error'), error_props)
 
 
-local broken_props = table.copy(api.basic_node)
-broken_props.tiles = get_tiles(part_def.tiles, tier_def.tile_postfix, 'broken')
+local broken_props = table.copy(part_props)
+broken_props.tiles = get_tiles(part_def.tiles[tier], 'broken')
 broken_props.groups.not_in_creative_inventory = 1
 broken_props.description = S("Broken Automated Robot")
 if api.config.repair_item ~= 'tubelib:repairkit' then
