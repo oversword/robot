@@ -621,10 +621,6 @@ robot.add_ability({
 robot.add_ability({
 	ability = 'carry',
 	item = function ()
-		--[[if minetest.get_modpath('hook') then
-			return 'hook:pchest'
-		else
-		]]
 		if minetest.get_modpath('unified_inventory') then
 			return 'unified_inventory:bag_large'
 		elseif minetest.get_modpath('default') then

@@ -1,5 +1,3 @@
--- local mod_name = minetest.get_cu
-
 robot = {}
 
 robot.internal_api = {}
@@ -47,6 +45,7 @@ api.nodeinfo = function(pos)
 
 		minetest.remove_node(pos)
 		minetest.after(0.01, api.stop_timer, api.nodeinfo(pos))
+		-- TODO: any sound design at all
 		-- minetest.sound_play("movestone", { pos = pos, max_hear_distance = 20, gain = 0.5 }, true)
 	end
 	for name, def in pairs(added_nodeinfos) do

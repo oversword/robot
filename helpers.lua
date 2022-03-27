@@ -32,7 +32,6 @@ end
 function api.move_robot(nodeinfo, new_pos)
 	nodeinfo.set_pos(new_pos)
 	local new_meta = nodeinfo.meta()
-	-- new_meta:set_string('pos', minetest.pos_to_string(new_pos))
 	new_meta:mark_as_private('code')
 	new_meta:mark_as_private('memory')
 end

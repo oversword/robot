@@ -30,7 +30,6 @@ end
 
 function api.formspecs.inventory(nodeinfo)
 	local meta = nodeinfo.meta()
-	-- local status = meta:get_string('status')
 	local extras_enabled_list = string.split(meta:get_string('extras'),',')
 	local extras_enabled = {}
 	for _,def in ipairs(extras_enabled_list) do
@@ -42,9 +41,6 @@ function api.formspecs.inventory(nodeinfo)
 	local info = nodeinfo.info()
 	local is_connective = api.is_connective(nodeinfo)
 	local has_connection = is_connective and api.is_connected(nodeinfo)
-	-- if is_connective then
-	-- 	has_connection = api.is_above_connective(nodeinfo)
-	-- end
 
 	local tier_def = api.tiers[info.tier]
 	local exec_button = ''
@@ -82,7 +78,6 @@ function api.formspecs.inventory(nodeinfo)
 				ability,ability,
 				minetest.formspec_escape(ability_obj.description)
 			)..(extras_enabled[ability] and ("item_image[%i,2;1,1;%s]"):format(2+#extra_abilities, "moretrees:coconut_1") or ""))
-			-- item_image[%i,%i;1,1;%s]
 		end
 	end
 

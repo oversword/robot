@@ -291,11 +291,11 @@ local function after_construct(pos)
 	end
 	meta:set_string('pos', minetest.pos_to_string(pos))
 
-		api.stop_timer(nodeinfo)
-		-- Need to do this so we can keep running after falling
-		if nodeinfo.info().status == 'running' then
-			api.start_timer(nodeinfo)
-		end
+	api.stop_timer(nodeinfo)
+	-- Need to do this so we can keep running after falling
+	if nodeinfo.info().status == 'running' then
+		api.start_timer(nodeinfo)
+	end
 end
 local function on_construct(pos)
 	local nodeinfo = api.nodeinfo(pos)
@@ -306,7 +306,6 @@ local function on_construct(pos)
 
 	meta:set_string('code', '')
 	meta:set_string('player_name', '??')
-	-- meta:set_string('pos', minetest.pos_to_string(pos))
 	meta:set_int('ignore_errors', 0)
 	meta:set_string('memory', minetest.serialize({}))
 
