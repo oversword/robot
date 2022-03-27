@@ -79,9 +79,9 @@ function api.ability_enabled(ability)
 end
 
 function api.any_has_ability(nodeinfo, ability, ignore_god_item)
-	local nodeinfos = nodeinfo.robot_set()
-	for _,nodeinfo in ipairs(nodeinfos) do
-		if api.has_ability(nodeinfo, ability, ignore_god_item) then return nodeinfo end
+	local ns = nodeinfo.robot_set()
+	for _,n in ipairs(ns) do
+		if api.has_ability(n, ability, ignore_god_item) then return n end
 	end
 end
 
@@ -210,7 +210,6 @@ robot.add_ability({
 	depends_on = 'any',
 	action = function (nodeinfo)
 		local ns = nodeinfo.robot_set()
-		local frontpos = nodeinfo.front()
 
 		local meta = nodeinfo.meta()
 		local owner = meta:get_string('player_name')
@@ -243,7 +242,6 @@ robot.add_ability({
 				minetest.check_for_falling(above)
 			end
 		else
-			local above = vector.add(ns[1].pos(), {x=0, y=1, z=0})
 			local can_move = true
 			for _,n in ipairs(ns) do
 				local frontpos = n.front()
@@ -397,9 +395,7 @@ robot.add_ability({
 			return
 		end
 
-		local node = actorinfo.node()
 		local meta = actorinfo.meta()
-		local pos = actorinfo.pos()
 
 		local direction
 		local frontpos
@@ -724,7 +720,6 @@ robot.add_ability({
 	ability = 'fill',
 	disabled = not minetest.get_modpath('tubelib'),
 	item = function ()
-		local fill_ability_item
 		if minetest.get_modpath('tubelib') then
 			return 'tubelib:tubeS'
 		end

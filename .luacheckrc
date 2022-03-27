@@ -4,6 +4,7 @@ max_line_length = 999
 
 read_globals = {
 	table = {fields = {"copy"}},
+	string = {fields = {"split"}},
 
 	"minetest", "vector", "default", "ItemStack", "dump",
 	"mesecon", "dispenser", "tubelib", "screwdriver"

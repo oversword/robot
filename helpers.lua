@@ -50,7 +50,6 @@ end
 function api.set_status(nodeinfo, status)
 	for _, n in ipairs(nodeinfo.robot_set()) do
 		local info = n.info()
-		local meta = n.meta()
 
 		if status ~= info.status then
 			n.set_node({ name = api.robot_name(info.tier, info.part, status) })

@@ -37,7 +37,6 @@ function api.formspecs.inventory(nodeinfo)
 		extras_enabled[def] = true
 	end
 	local inv = nodeinfo.inv()
-	local main_size = inv:get_size('main')
 	local fuel_size = inv:get_size('fuel')
 	local abilities_size = inv:get_size('abilities')
 	local info = nodeinfo.info()

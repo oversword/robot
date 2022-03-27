@@ -302,7 +302,6 @@ local function on_construct(pos)
 	local meta = nodeinfo.meta()
 	local info = nodeinfo.info()
 	local inv = nodeinfo.inv()
-	local node = nodeinfo.node()
 	local tier_def = api.tiers[info.tier]
 
 	meta:set_string('code', '')

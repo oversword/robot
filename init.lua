@@ -37,7 +37,6 @@ api.nodeinfo = function(pos)
 		end
 	end
 	nodeapi.set_pos = function(new_pos)
-		local pos = nodeapi.pos()
 		local node = nodeapi.node()
 		local meta = nodeapi.meta():to_table()
 
@@ -49,7 +48,6 @@ api.nodeinfo = function(pos)
 		minetest.remove_node(pos)
 		minetest.after(0.01, api.stop_timer, api.nodeinfo(pos))
 		-- minetest.sound_play("movestone", { pos = pos, max_hear_distance = 20, gain = 0.5 }, true)
-		return newinfo
 	end
 	for name, def in pairs(added_nodeinfos) do
 		nodeapi[name] = function ()

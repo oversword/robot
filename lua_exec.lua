@@ -282,7 +282,7 @@ local function run_inner(nodeinfo)
 			args = {}
 		}
 	end
-	
+
 	-- local logs = {}
 	-- commands.log = function (...)
 	-- 	local lg = {}

@@ -11,8 +11,6 @@ local function on_timer (pos, dtime)
 	end
 	local meta = nodeinfo.meta()
 
-	local inv = nodeinfo.inv()
-
 	local empty = true
 	for _,n in ipairs(nodeinfo.robot_set()) do
 		if not n.inv():is_empty('fuel') then
@@ -414,7 +412,6 @@ if api.config.repair_item ~= 'tubelib:repairkit' then
 		local taken = item:take_item(1)
 		if taken:is_empty() then return end
 
-		local meta = nodeinfo.meta()
 		api.clear_error(nodeinfo)
 		api.set_status(nodeinfo, 'stopped')
 
