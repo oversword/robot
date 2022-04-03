@@ -193,12 +193,37 @@ function api.formspecs.broken()
 	)
 end
 
+local formspec_data = {}
 api.formspec_data = {}
+function api.formspec_data.set(player_name, attrs)
+	formspec_data[player_name] = formspec_data[player_name] or {}
+	for k,v in pairs(attrs) do
+		formspec_data[player_name][k] = v
+	end
+end
+function api.formspec_data.clear(player_name, attr)
+	if not formspec_data[player_name] then return end
+
+	if attr then
+		formspec_data[player_name][attr] = nil
+	else
+		formspec_data[player_name] = nil
+	end
+end
+function api.formspec_data.get(player_name, attr)
+	if not formspec_data[player_name] then return end
+
+	if attr then
+		return formspec_data[player_name][attr]
+	else
+		return formspec_data[player_name]
+	end
+end
 
 function api.on_receive_fields(pos, form_name, fields, sender)
 	local player_name = sender:get_player_name()
 	if fields.quit then
-		api.formspec_data[player_name] = nil
+		api.formspec_data.clear(player_name)
 		return
 	end
 	local nodeinfo = api.nodeinfo(pos)
@@ -207,8 +232,7 @@ function api.on_receive_fields(pos, form_name, fields, sender)
 		return
 	end
 	if fields.program_edit then
-		api.formspec_data[player_name] = api.formspec_data[player_name] or {}
-		api.formspec_data[player_name].pos = pos
+		api.formspec_data.set(player_name, { pos=pos })
 		local meta = nodeinfo.meta()
 		local code = meta:get_string('code')
 		local err = meta:get_string('error')
@@ -225,8 +249,7 @@ function api.on_receive_fields(pos, form_name, fields, sender)
 		elseif status == 'running' then
 			api.set_status(nodeinfo, 'stopped')
 		elseif status == 'error' then
-			api.formspec_data[player_name] = api.formspec_data[player_name] or {}
-			api.formspec_data[player_name].pos = pos
+			api.formspec_data.set(player_name, { pos=pos })
 			minetest.show_formspec(player_name, 'robot_error', api.formspecs.error(nodeinfo.meta():get_string('error')))
 		elseif status == 'broken' then
 			minetest.show_formspec(player_name, 'robot_broken', api.formspecs.broken())
@@ -259,9 +282,7 @@ function api.on_receive_fields(pos, form_name, fields, sender)
 		end
 		meta:set_string('extras', table.concat(extras_enabled_new, ','))
 
-		api.formspec_data[player_name] = api.formspec_data[player_name] or {}
-		api.formspec_data[player_name].pos = pos
-		api.formspec_data[player_name].psuedo_metadata = true
+		api.formspec_data.set(player_name, { pos=pos, psuedo_metadata=true })
 		api.update_formspec(nodeinfo)
 		minetest.show_formspec(player_name, 'robot_inventory', meta:get_string('formspec'))
 		return
@@ -271,18 +292,22 @@ end
 minetest.register_on_player_receive_fields(function(player, formname, fields)
 	if formname == 'robot_inventory' then
 		local player_name = player:get_player_name()
-		local pos = api.formspec_data[player_name].pos
+		local pos = api.formspec_data.get(player_name, 'pos')
+		if not pos then return end
+
 		api.on_receive_fields(pos, formname, fields, player)
 		return
 	end
 	if formname == 'robot_error' then
 		local player_name = player:get_player_name()
 		if fields.quit then
-			api.formspec_data[player_name] = nil
+			api.formspec_data.clear(player_name)
 			return
 		end
 		if fields.dismiss_error then
-			local pos = api.formspec_data[player_name].pos
+			local pos = api.formspec_data.get(player_name, 'pos')
+			if not pos then return end
+
 			local nodeinfo = api.nodeinfo(pos)
 			local meta = nodeinfo.meta()
 			if nodeinfo.info().status == 'error' then
@@ -290,7 +315,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 				api.set_status(nodeinfo, 'stopped')
 			end
 
-			api.formspec_data[player_name].psuedo_metadata = true
+			api.formspec_data.set(player_name, {psuedo_metadata = true})
 			minetest.show_formspec(player_name, 'robot_inventory', meta:get_string('formspec'))
 		end
 		return
@@ -300,11 +325,13 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 
 	local player_name = player:get_player_name()
 	if fields.quit then
-		api.formspec_data[player_name] = nil
+		api.formspec_data.clear(player_name)
 		return
 	end
 
-	local pos = api.formspec_data[player_name].pos
+	local pos = api.formspec_data.get(player_name, 'pos')
+	if not pos then return end
+
 	local nodeinfo = api.nodeinfo(pos)
 	local meta = nodeinfo.meta()
 
@@ -323,7 +350,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 			api.set_status(nodeinfo, 'stopped')
 		end
 
-		api.formspec_data[player_name].psuedo_metadata = true
+		api.formspec_data.set(player_name, {psuedo_metadata = true})
 		minetest.show_formspec(player_name, 'robot_inventory', meta:get_string('formspec'))
 	end
 end)

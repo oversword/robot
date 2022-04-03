@@ -73,9 +73,7 @@ local function on_metadata_inventory_put(pos, listname, index, stack, player)
 	end
 	if update_formspec then
 		api.update_formspec(nodeinfo)
-		if api.formspec_data[player_name]
-			and api.formspec_data[player_name].psuedo_metadata
-		then
+		if api.formspec_data.get(player_name, 'psuedo_metadata') then
 			minetest.show_formspec(player_name, 'robot_inventory', nodeinfo.meta():get_string('formspec'))
 		end
 	end
@@ -111,9 +109,7 @@ local function on_metadata_inventory_take(pos, listname, index, stack, player)
 	end
 	if update_formspec then
 		api.update_formspec(nodeinfo)
-		if api.formspec_data[player_name]
-			and api.formspec_data[player_name].psuedo_metadata
-		then
+		if api.formspec_data.get(player_name, 'psuedo_metadata') then
 			minetest.show_formspec(player_name, 'robot_inventory', nodeinfo.meta():get_string('formspec'))
 		end
 	end
