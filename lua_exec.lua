@@ -1,5 +1,7 @@
 local api = robot.internal_api
 
+local debug_logs = false
+
 -- Safe LUA execution, stolen from mesecons/mesecons_luacontroller/init.lua
 
 -------------------------
@@ -283,18 +285,21 @@ local function run_inner(nodeinfo)
 		}
 	end
 
-	-- local logs = {}
-	-- commands.log = function (...)
-	-- 	local lg = {}
-	-- 	for i,v in ipairs({...}) do
-	-- 		if type(v) == 'table' then
-	-- 			table.insert(lg, table.copy(v))
-	-- 		else
-	-- 			table.insert(lg, v)
-	-- 		end
-	-- 	end
-	-- 	table.insert(logs, lg)
-	-- end
+	local logs
+	if debug_logs then
+		logs = {}
+		commands.log = function (...)
+			local lg = {}
+			for i,v in ipairs({...}) do
+				if type(v) == 'table' then
+					table.insert(lg, table.copy(v))
+				else
+					table.insert(lg, v)
+				end
+			end
+			table.insert(logs, lg)
+		end
+	end
 
 	local env = create_environment(pos, mem, commands, send_warning)
 
@@ -314,11 +319,13 @@ local function run_inner(nodeinfo)
 	-- Save memory. This may burn the luacontroller if a memory overflow occurs.
 	save_memory(nodeinfo, env.mem)
 
-	-- if #logs then
-	-- 	for i,l in ipairs(logs) do
-	-- 		minetest.log("error", dump(l))
-	-- 	end
-	-- end
+	if debug_logs then
+		if #logs then
+			for i,l in ipairs(logs) do
+				minetest.log("error", dump(l))
+			end
+		end
+	end
 
 	if action_call then
 		local action_func

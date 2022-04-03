@@ -76,5 +76,6 @@ function api.set_error(nodeinfo, error)
 	end
 	if meta:get_int('ignore_errors') ~= 1 then
 		api.set_status(nodeinfo, 'error')
+		return true
 	end
 end

@@ -64,8 +64,7 @@ local function on_timer (pos, dtime)
 
 	if not ok then
 		-- minetest.log("error",  errmsg)
-		api.set_error(nodeinfo, errmsg)
-		return false
+		return not api.set_error(nodeinfo, errmsg)
 	end
 
 	if errmsg ~= "" then
