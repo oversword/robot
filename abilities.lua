@@ -746,12 +746,12 @@ robot.add_ability({
 	done_by = { legs = true },
 	modifier = function (nodeinfo)
 		if not nodeinfo.speed_enabled() then
-			nodeinfo.set_node({ param1 = nodeinfo.node().param1 + 1 })
+			nodeinfo.meta():set_int('robot_speed', 1)
 		end
 	end,
 	un_modifier = function (nodeinfo)
 		if nodeinfo.speed_enabled() then
-			nodeinfo.set_node({ param1 = nodeinfo.node().param1 - 1 })
+			nodeinfo.meta():set_int('robot_speed', 0)
 		end
 	end
 })
@@ -842,12 +842,12 @@ robot.add_ability({
 	done_by = { legs = true, body = true, head = true },
 	modifier = function (nodeinfo)
 		if not nodeinfo.boost_enabled() then
-			nodeinfo.set_node({ param1 = nodeinfo.node().param1 + 2 })
+			nodeinfo.meta():set_int('robot_boost', 1)
 		end
 	end,
 	un_modifier = function (nodeinfo)
 		if nodeinfo.boost_enabled() then
-			nodeinfo.set_node({ param1 = nodeinfo.node().param1 - 2 })
+			nodeinfo.meta():set_int('robot_boost', 0)
 		end
 	end
 })

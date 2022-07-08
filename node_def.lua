@@ -265,10 +265,10 @@ end
 local function on_destruct(pos)
 	api.correct_connection(api.nodeinfo(vector.subtract(pos, {x=0,y=1,z=0})))
 end
-local function after_construct(pos)
 
-	local nodeinfo = api.nodeinfo(pos)
+local function after_construct(nodeinfo)
 	local meta = nodeinfo.meta()
+	local pos = nodeinfo.pos()
 
 	local old_pos_str = meta:get_string('pos')
 	local any_diff = false
@@ -291,6 +291,16 @@ local function after_construct(pos)
 	-- Need to do this so we can keep running after falling
 	if nodeinfo.info().status == 'running' then
 		api.start_timer(nodeinfo)
+	end
+end
+local function try_after_construct(pos)
+	local nodeinfo = api.nodeinfo(pos)
+	local meta = nodeinfo.meta()
+
+	if meta:get_string('player_name') == '??' then
+		minetest.after(0, try_after_construct, pos)
+	else
+		after_construct(nodeinfo)
 	end
 end
 local function on_construct(pos)
@@ -318,7 +328,7 @@ local function on_construct(pos)
 	end
 	inv:set_size('abilities', (tier_def.ability_slots or 5)-default_abilities)
 
-	minetest.after(0.1, after_construct, pos)
+	minetest.after(0, try_after_construct, pos)
 end
 
 local function on_rightclick(pos, node, clicker, itemstack, pointed_thing)
@@ -334,7 +344,6 @@ api.basic_node = {
 	groups = {falling_node = 1, cracky=2},
 
 	buildable_to = false,
-	paramtype = "none",
 	paramtype2 = "facedir",
 	is_ground_content = false,
 	stack_max = 1,

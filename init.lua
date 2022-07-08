@@ -109,12 +109,10 @@ api.add_nodeinfo('info', function (nodeapi)
 	return {tier=tier, part=part, status=status}
 end, {'node.name'}, {split_obj = true})
 api.add_nodeinfo('speed_enabled', function (nodeapi)
-	local param1 = nodeapi.node().param1
-	return param1 % 2 == 1
+	return nodeapi.meta():get_int('robot_speed') == 1
 end, {'node.param1'})
 api.add_nodeinfo('boost_enabled', function (nodeapi)
-	local param1 = nodeapi.node().param1
-	return math.floor(param1 / 2) % 2 == 1
+	return nodeapi.meta():get_int('robot_boost') == 1
 end, {'node.param1'})
 api.add_nodeinfo('any_speed_enabled', function (nodeapi)
 	for _,n in ipairs(nodeapi.robot_set()) do

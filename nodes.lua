@@ -74,13 +74,13 @@ local function on_timer (pos, dtime)
 	return true
 end
 
-local anim_texture = function (image, dur)
+local anim_texture = function (image, dur, aspect)
 	return {
 		name = image,
 		animation = {
-		type = "vertical_frames",
-			aspect_w = 8,
-			aspect_h = 8,
+			type = "vertical_frames",
+			aspect_w = (aspect and aspect.w) or 8,
+			aspect_h = (aspect and aspect.h) or 8,
 			length = dur,
 		}
 	}
@@ -139,12 +139,18 @@ local god_tiles = {
 		error = anim_texture('robot_light_side_error.png', 0.8),
 		broken = anim_texture('robot_light_side_broken.png',  0.8),
 	},
-	side_legs = {
-		stopped = anim_texture('robot_light_legs_side.png', 2),
-		running = anim_texture('robot_light_legs_side_running.png', 0.8),
-		error = anim_texture('robot_light_legs_side_error.png', 0.8),
-		broken = anim_texture('robot_light_legs_side_broken.png', 0.8),
-	}
+	body = {
+		stopped = anim_texture('robot_light_body.png', 2,{w=16,h=32}),
+		running = 'robot_light_body_running.png',
+		error = anim_texture('robot_light_body_error.png', 0.8,{w=16,h=32}),
+		broken = anim_texture('robot_light_body_broken.png', 0.8,{w=16,h=32}),
+	},
+	legs = {
+		stopped = anim_texture('robot_light_legs.png', 2,{w=16,h=32}),
+		running = anim_texture('robot_light_legs_running.png', 0.8,{w=16,h=32}),
+		error = anim_texture('robot_light_legs_error.png', 0.8,{w=16,h=32}),
+		broken = anim_texture('robot_light_legs_broken.png', 0.8,{w=16,h=32}),
+	},
 }
 local man_tiles = {
 	top = 'robot_norm_top.png',
@@ -239,12 +245,7 @@ api.parts = {
 				devil_tiles.front_body,
 			},
 			god = {
-				god_tiles.side,
-				god_tiles.top,
-				god_tiles.side,
-				god_tiles.side,
-				god_tiles.side,
-				god_tiles.side,
+				god_tiles.body,
 			},
 		},
 		connects_above = {head=true},
@@ -272,12 +273,7 @@ api.parts = {
 				devil_tiles.front_legs,
 			},
 			god = {
-				god_tiles.side,
-				god_tiles.top,
-				god_tiles.side_legs,
-				god_tiles.side_legs,
-				god_tiles.side_legs,
-				god_tiles.side_legs,
+				god_tiles.legs,
 			},
 		},
 		connects_above = {head=true,body=true},
@@ -312,6 +308,34 @@ api.tiers = {
 		inventory_size = 4,
 		form_size = 10,
 		max_fall = 16,
+		models = {
+			body = 'octohedron.obj',
+			legs = 'dome.obj',
+		},
+		node_boxes = {
+			head = {
+				type = "fixed",
+				fixed = {
+					{-1/4, -1/4, -1/4, 1/4, 1/4, 1/4},
+				},
+			}
+		},
+		extra_props = {
+			paramtype = "light",
+			light_source = 1,
+			collision_box = {
+				type = "fixed",
+				fixed = {
+					{-3/8, -3/8, -3/8, 3/8, 3/8, 3/8},
+				},
+			},
+			selection_box = {
+				type = "fixed",
+				fixed = {
+					{-3/8, -3/8, -3/8, 3/8, 3/8, 3/8},
+				},
+			},
+		},
 		extra_abilities = {
 			"fuel_swap",
 			"boost",
@@ -367,8 +391,22 @@ end
 for tier,tier_def in pairs(api.tiers) do
 local tier_props = table.copy(api.basic_node)
 
+if tier_def.extra_props then
+	for prop, val in pairs(tier_def.extra_props) do
+		tier_props[prop] = val
+	end
+end
+
 for part,part_def in pairs(api.parts) do
 local part_props = table.copy(tier_props)
+
+if tier_def.models and tier_def.models[part] then
+	part_props.drawtype = "mesh"
+	part_props.mesh = tier_def.models[part]
+elseif tier_def.node_boxes and tier_def.node_boxes[part] then
+	part_props.drawtype = "nodebox"
+	part_props.node_box = tier_def.node_boxes[part]
+end
 
 if part_def.description then
 	part_props.description = part_props.description .. " ("..part_def.description..")"
