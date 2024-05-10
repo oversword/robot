@@ -218,7 +218,7 @@ local function save_memory(nodeinfo, mem)
 	end
 end
 
-local function runtime_ability(nodeinfo, action)
+local function runtime_ability(nodeinfo, action, part)
 	local ran = false
 	local result
 	return function (...)
@@ -226,7 +226,7 @@ local function runtime_ability(nodeinfo, action)
 			return result
 		end
 		ran = true
-		result = action(nodeinfo, ...)
+		result = action(nodeinfo, part, ...)
 		return result
 	end
 end
@@ -250,16 +250,36 @@ local function run_inner(nodeinfo)
 	-- Create environment
 
 	local commands = {}
+
+	local parts = nodeinfo.parts()
+	for part,_ in pairs(api.parts) do
+		if parts[part] then
+			commands[part] = {}
+		end
+	end
+
+
 	local action_call = nil
 
 	for _,ability in ipairs(api.abilities) do
 		if ability.action then
 			if not api.any_has_ability(nodeinfo, ability.ability) then
-				commands[ability.ability] = function ()
+				local call = function ()
 					error(api.translations.cant.." "..ability.ability..": "..api.translations.noability, 2)
+				end
+				commands[ability.ability] = call
+				for part,_ in pairs(api.parts) do
+					if commands[part] then
+						commands[part][ability.ability] = call
+					end
 				end
 			elseif ability.runtime then
 				commands[ability.ability] = runtime_ability(nodeinfo, ability.action)
+				for part,_ in pairs(api.parts) do
+					if commands[part] then
+						commands[part][ability.ability] = runtime_ability(nodeinfo, ability.action, part)
+					end
+				end
 			else
 				commands[ability.ability] = function (...)
 					if action_call then
@@ -270,6 +290,21 @@ local function run_inner(nodeinfo)
 						ability = ability.ability,
 						args = {...}
 					}
+				end
+				for part,_ in pairs(api.parts) do
+					if commands[part] then
+						commands[part][ability.ability] = function (...)
+							if action_call then
+								error(api.translations.cant.." "..ability.ability..": "..api.translations.onlyone, 2)
+								return
+							end
+							action_call = {
+								ability = ability.ability,
+								args = {...},
+								part = part,
+							}
+						end
+					end
 				end
 			end
 		end
@@ -338,7 +373,7 @@ local function run_inner(nodeinfo)
 			action_func = ability_obj.action
 		end
 
-		local action_success, newinfo_or_err, fuel_used = pcall(action_func, nodeinfo, unpack(action_call.args))
+		local action_success, newinfo_or_err, fuel_used = pcall(action_func, nodeinfo, action_call.part, unpack(action_call.args))
 
 		if not action_success then
 			return false, api.translations.cant.." "..action_call.ability..": "..newinfo_or_err

@@ -24,6 +24,10 @@ function robot.add_ability(ability_obj)
 		error("You must define an ability name as ability_obj.ability")
 		return
 	end
+	if api.parts[ability_obj.ability] then
+		error(("Ability cannot be called '%s' as it will conflict with robot.%s.[action] ect."):format(ability_obj.ability))
+		return
+	end
 	if not ability_obj.description then
 		error("You must define an ability description as ability_obj.description")
 		return
@@ -167,6 +171,63 @@ function api.unapply_ability(nodeinfo, player_name, ability)
 end
 
 
+local directionParam = {
+	values = {
+		front = function (nodeinfo)
+			return {
+				direction = nodeinfo.direction(),
+				frontpos = nodeinfo.front(),
+			}
+		end,
+		up = function (nodeinfo)
+			local ns = nodeinfo.robot_set()
+			return {
+				direction = {x=0,y=1,z=0},
+				frontpos = vector.add(ns[1].pos(), {x=0,y=1,z=0})
+			}
+		end,
+		down = function (nodeinfo)
+			local ns = nodeinfo.robot_set()
+			return {
+				direction = {x=0,y=-1,z=0},
+				frontpos = vector.add(ns[#ns].pos(), {x=0,y=-1,z=0})
+			}
+		end,
+		['up-front'] = function (nodeinfo)
+			local ns = nodeinfo.robot_set()
+			local direction = vector.add({x=0,y=1,z=0}, nodeinfo.direction())
+			return {
+				direction = direction,
+				frontpos = vector.add(ns[1].pos(), direction),
+			}
+		end,
+		['down-front'] = function (nodeinfo)
+			local ns = nodeinfo.robot_set()
+			local direction = vector.add({x=0,y=-1,z=0}, nodeinfo.direction())
+			return {
+				direction = direction,
+				frontpos = vector.add(ns[#ns].pos(), direction)
+			}
+		end,
+	},
+	parse = function (nodeinfo, dir, def)
+		if not dir then dir = def or 'front' end
+
+		if type(dir) ~= 'string' then
+			error('looking dir must be a string', 2)
+			return
+		end
+		if not directionParam.values[dir] then
+			error(("direction '%s' is invalid"):format(dir), 2)
+			return
+		end
+
+		return directionParam.values[dir](nodeinfo)
+	end
+}
+
+
+-- [[ Turn ]]
 robot.add_ability({
 	ability = 'turn',
 	item = function()
@@ -182,7 +243,7 @@ robot.add_ability({
 	done_by = { head = true, legs = true },
 	act_on = 'all',
 	depends_on = 'any',
-	action = function (nodeinfo, anticlockwise)
+	action = function (nodeinfo, _part, anticlockwise)
 		local ns = nodeinfo.robot_set()
 		for _, n in ipairs(ns) do
 			local node = n.node()
@@ -195,7 +256,7 @@ robot.add_ability({
 	end
 })
 
-
+-- [[ Move ]]
 robot.add_ability({
 	ability = 'move',
 	item = function ()
@@ -208,7 +269,7 @@ robot.add_ability({
 	done_by = { head = true, legs = true },
 	act_on = 'all',
 	depends_on = 'any',
-	action = function (nodeinfo)
+	action = function (nodeinfo, _part)
 		local ns = nodeinfo.robot_set()
 
 		local meta = nodeinfo.meta()
@@ -270,8 +331,7 @@ robot.add_ability({
 	end
 })
 
-
-
+-- [[ Climb ]]
 robot.add_ability({
 	ability = 'climb',
 	item = function ()
@@ -284,7 +344,7 @@ robot.add_ability({
 	done_by = { head = true, legs = true },
 	act_on = 'all',
 	depends_on = 'any',
-	action = function (nodeinfo)
+	action = function (nodeinfo, _part)
 		local ns = nodeinfo.robot_set()
 		local lastinfo = ns[#ns]
 		local meta = nodeinfo.meta()
@@ -315,8 +375,7 @@ robot.add_ability({
 	end
 })
 
-
-
+-- [[ Look ]]
 robot.add_ability({
 	ability = "look",
 	item = function ()
@@ -328,20 +387,27 @@ robot.add_ability({
 		return "default:acacia_leaves"
 	end,
 	description = S("Get the name of the node in front of the robot"),
-	command_example = "node_name = robot.look()",
+	command_example = "node_name = robot.look(<dir 'up'|'front'/nil|'down'|'up-front'|'down-front'>)",
 	done_by = { head = true },
 	act_on = 'first',
 	depends_on = 'self',
-	action = function (nodeinfo)
-		local actorinfo = api.any_has_ability(nodeinfo, 'look')
-		if not actorinfo then return end
+	action = function (nodeinfo, part, dir)
+		local hasability = api.any_has_ability(nodeinfo, 'look')
+		if not hasability then return end
 
-		return minetest.get_node(actorinfo.front()).name
+		local actorinfo = hasability
+		if part then
+			actorinfo = nodeinfo.parts()[part] or hasability
+		end
+
+		local dirPos = directionParam.parse(actorinfo, dir, 'front')
+
+		return minetest.get_node(dirPos.frontpos).name
 	end,
 	runtime = true
 })
 
-
+-- [[ Locate ]]
 robot.add_ability({
 	ability = "locate",
 	item = function ()
@@ -357,9 +423,16 @@ robot.add_ability({
 	description = S("Get the position of the robot"),
 	command_example = "node_pos = robot.locate()",
 	done_by = { head = true },
-	action = function (nodeinfo)
-		local ns = nodeinfo.robot_set()
-		local pos = ns[#ns].pos()
+	action = function (nodeinfo, part)
+		local hasability = api.any_has_ability(nodeinfo, 'locate')
+		if not hasability then return end
+
+		local actorinfo = hasability
+		if part then
+			actorinfo = nodeinfo.parts()[part] or hasability
+		end
+
+		local pos = actorinfo.pos()
 		return {
 			x = pos.x,
 			y = pos.y,
@@ -369,7 +442,7 @@ robot.add_ability({
 	runtime = true
 })
 
-
+-- [[ Place ]]
 robot.add_ability({
 	ability = 'place',
 	disabled = not minetest.get_modpath('dispenser'),
@@ -377,48 +450,37 @@ robot.add_ability({
 	act_on = 'first',
 	depends_on = 'self',
 	description = S("Place a block down"),
-	command_example = "robot.place(<dir 'up'|'front'/nil|'down'>)",
+	command_example = "robot.place(<dir 'up'|'front'/nil|'down'|'up-front'|'down-front'>)",
 	done_by = { head = true, body = true },
-	action = function (nodeinfo, dir)
-		local ns = nodeinfo.robot_set()
-		local actorinfo = api.any_has_ability(nodeinfo, 'place')
-		if not actorinfo then return end
+	action = function (nodeinfo, part, dir)
+		local hasability = api.any_has_ability(nodeinfo, 'place')
+		if not hasability then return end
 
-		if not dir then dir = 'front' end
-
-		if type(dir) ~= 'string' then
-			error('placing dir must be a string',2)
-			return
-		end
-		if not (dir == 'up' or dir == 'front' or dir == 'down') then
-			error(("direction '%s' is invalid"):format(dir), 2)
-			return
+		local actorinfo = hasability
+		if part then
+			actorinfo = nodeinfo.parts()[part] or hasability
 		end
 
-		local meta = actorinfo.meta()
-
-		local direction
-		local frontpos
-		if dir == 'front' then
-			direction = actorinfo.direction()
-			frontpos = actorinfo.front()
-		elseif dir == 'up' then
-			direction = {x=0,y=1,z=0}
-			frontpos = vector.add(ns[1].pos(), direction)
-		elseif dir == 'down' then
+		local dirPos = directionParam.parse(actorinfo, dir, 'front')
+		local direction = dirPos.direction
+		local frontpos = dirPos.frontpos
+		if dir === 'down' then
 			if not api.any_has_ability(nodeinfo, 'climb') then
 				error('requires climb ability to place block below', 2)
 				return
 			end
-			direction = {x=0,y=-1,z=0}
-			frontpos = ns[#ns].pos()
+			frontpos = vector.add(dirPos.frontpos, {x=0,y=1,z=0})
 		end
+
+		local meta = actorinfo.meta()
 		local owner = meta:get_string('player_name')
 
 		if minetest.is_protected(frontpos, owner) then
 			error("protected area in the way", 2)
 			return
 		end
+
+		local ns = nodeinfo.robot_set()
 
 		local inv_info
 		local next_index
@@ -495,8 +557,7 @@ robot.add_ability({
 	end
 })
 
-
-
+-- [[ Use ]]
 robot.add_ability({
 	ability = 'use',
 	disabled = not minetest.get_modpath('dispenser'),
@@ -509,15 +570,22 @@ robot.add_ability({
 	act_on = 'first',
 	depends_on = 'self',
 	description = S("Use an item (not a tool)"),
+	command_example = "robot.use(<dir 'up'|'front'/nil|'down'|'up-front'|'down-front'>)",
 	done_by = { head = true, body = true },
-	action = function (nodeinfo)
-		local actorinfo = api.any_has_ability(nodeinfo, 'use')
-		if not actorinfo then return end
+	action = function (nodeinfo, part, dir)
+		local hasability = api.any_has_ability(nodeinfo, 'use')
+		if not hasability then return end
+
+		local actorinfo = hasability
+		if part then
+			actorinfo = nodeinfo.parts()[part] or hasability
+		end
+
+		local dirPos = directionParam.parse(actorinfo, dir, 'front')
 
 		local inv_info
 		local next_stack
 		local next_index
-		local frontpos = actorinfo.front()
 		for _,n in ipairs(nodeinfo.robot_set()) do
 			local node_inv = n.inv()
 			local list = node_inv:get_list('main')
@@ -543,8 +611,8 @@ robot.add_ability({
 			return
 		end
 		local player = dispenser.actions.fake_player(next_stack, {
-			front = frontpos,
-			dir = actorinfo.direction(),
+			front = dirPos.frontpos,
+			dir = dirPos.direction,
 			pos = actorinfo.pos(),
 			meta = inv_info.meta(),
 			index = next_index
@@ -555,8 +623,8 @@ robot.add_ability({
 		end
 		local result = def.on_use(next_stack, player, {
 			type="node",
-			under=frontpos,
-			above=vector.add(frontpos, {x=0,y=1,z=0})
+			under=dirPos.frontpos,
+			above=vector.add(dirPos.frontpos, {x=0,y=1,z=0})
 		})
 		if result then
 			inv_info.inv():set_stack('main', next_index, result)
@@ -564,8 +632,7 @@ robot.add_ability({
 	end
 })
 
-
-
+-- [[ Switch ]]
 robot.add_ability({
 	ability = 'switch',
 	disabled = not minetest.get_modpath('tubelib'),
@@ -578,19 +645,26 @@ robot.add_ability({
 	act_on = 'first',
 	depends_on = 'self',
 	description = S("Switch a tubelib machine on and off"),
+	command_example = "robot.switch(<dir 'up'|'front'/nil|'down'|'up-front'|'down-front'>)",
 	done_by = { head = true, body = true },
-	action = function (nodeinfo)
-		local actorinfo = api.any_has_ability(nodeinfo, 'switch')
-		if not actorinfo then return end
+	action = function (nodeinfo, part, dir)
+		local hasability = api.any_has_ability(nodeinfo, 'switch')
+		if not hasability then return end
 
-		local frontpos = actorinfo.front()
+		local actorinfo = hasability
+		if part then
+			actorinfo = nodeinfo.parts()[part] or hasability
+		end
 
-		local tube_meta = minetest.get_meta(frontpos)
+		local dirPos = directionParam.parse(actorinfo, dir, 'front')
+
+		local tube_meta = minetest.get_meta(dirPos.frontpos)
 
 		local state = tube_meta:get_int("tubelib_state")
-		local number = tubelib.get_node_number(frontpos)
+		if not state then return end
 
-		if not state or not number or number == "" then return end
+		local number = tubelib.get_node_number(dirPos.frontpos)
+		if not number or number == "" then return end
 
 		local meta = actorinfo.meta()
 		local owner = meta:get_string('player_name')
@@ -599,8 +673,7 @@ robot.add_ability({
 	end
 })
 
-
-
+-- [[ Push ]]
 robot.add_ability({
 	ability = 'push',
 	disabled = not minetest.get_modpath('mesecons_mvps'),
@@ -616,8 +689,7 @@ robot.add_ability({
 	description = S("Push a block when moving forwards")
 })
 
-
-
+-- [[ Carry ]]
 robot.add_ability({
 	ability = 'carry',
 	item = function ()
@@ -673,8 +745,7 @@ robot.add_ability({
 	end,
 })
 
-
-
+-- [[ Fuel ]]
 robot.add_ability({
 	ability = 'fuel',
 	item = function ()
@@ -710,8 +781,7 @@ robot.add_ability({
 	end,
 })
 
-
-
+-- [[ Fill ]]
 robot.add_ability({
 	ability = 'fill',
 	disabled = not minetest.get_modpath('tubelib'),
@@ -727,9 +797,7 @@ robot.add_ability({
 	description = S("Fill and empty the inventory using pushers"),
 })
 
-
-
-
+-- [[ Speed ]]
 robot.add_ability({
 	ability = 'speed',
 	item = function ()
@@ -755,10 +823,15 @@ robot.add_ability({
 		end
 	end
 })
+
+-- [[ Connectivity ]]
 robot.add_ability({
 	ability = 'connectivity',
 	item = function ()
-		return "digistuff:insulated_straight"
+		if minetest.get_modpath('digistuff') then
+			return "digistuff:insulated_straight"
+		end
+		return "default:obsidian_glass"
 	end,
 	act_on = 'self',
 	depends_on = 'self',
@@ -773,7 +846,7 @@ robot.add_ability({
 	end,
 })
 
-
+-- [[ Fuel Swap ]]
 robot.add_ability({
 	interface_enabled = true,
 	ability = "fuel_swap",
@@ -827,6 +900,8 @@ robot.add_ability({
 		inv:set_size('fuel', new_size)
 	end,
 })
+
+-- [[ Boost ]]
 robot.add_ability({
 	interface_enabled = true,
 	ability = "boost",
@@ -857,7 +932,7 @@ function api.stop_action (nodeinfo)
 	api.set_status(nodeinfo, 'stopped')
 	return nil, 0
 end
-function api.log_action (nodeinfo,...)
+function api.log_action (nodeinfo,_part,...)
 	local meta = nodeinfo.meta()
 	local owner = meta:get_string('player_name')
 	minetest.chat_send_player(owner, "[robot] LOG: "..dump({...}))

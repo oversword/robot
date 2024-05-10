@@ -49,7 +49,7 @@ api.nodeinfo = function(pos)
 		-- minetest.sound_play("movestone", { pos = pos, max_hear_distance = 20, gain = 0.5 }, true)
 	end
 	for name, def in pairs(added_nodeinfos) do
-		nodeapi[name] = function ()
+		nodeapi[name] = function (...)
 			local do_run = not cache_vers[name]
 			if not do_run then
 				for i,d in ipairs(def.depends) do
@@ -60,7 +60,7 @@ api.nodeinfo = function(pos)
 				end
 			end
 			if do_run then
-				local val = def.method(nodeapi)
+				local val = def.method(nodeapi, ...)
 				if def.opts.split_obj and type(val) == 'table' then
 					for n,v in pairs(val) do
 						if v ~= (type(cache[name]) == 'table' and cache[name] or {})[n] then
@@ -124,6 +124,14 @@ api.add_nodeinfo('any_boost_enabled', function (nodeapi)
 		if n.boost_enabled() then return true end
 	end
 end, {'boost_enabled','pos','robot_set'})
+
+api.add_nodeinfo('parts', function (nodeapi)
+	local ret = {}
+	for _,n in ipairs(nodeapi.robot_set()) do
+		ret[n.info().part] = n
+	end
+	return ret
+end, {'robot_set'})
 
 
 
@@ -236,10 +244,10 @@ api.config.max_push = 1--mesecon.setting("movestone_max_push", 50)
 api.config.step_delay = 2
 
 api.dofile('helpers')
+api.dofile('node_def')
+api.dofile('nodes')
 api.dofile('abilities')
 api.dofile('lua_exec')
 api.dofile('formspecs')
-api.dofile('node_def')
-api.dofile('nodes')
 
 robot.internal_api = nil
