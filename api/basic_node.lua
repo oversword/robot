@@ -53,7 +53,8 @@ local function on_metadata_inventory_put(pos, listname, index, stack, player)
 	local nodeinfo = api.nodeinfo(pos)
 	local update_formspec = false
 	if item_name == api.config.god_item then
-		for _,ability in ipairs(api.abilities) do
+		for _,ability_name in ipairs(api.abilities()) do
+			local ability = api.ability(ability_name)
 			if not ability.interface_enabled
 			and api.can_have_ability(nodeinfo, ability.ability)
 			and not api.has_ability(nodeinfo, ability.ability, true)
@@ -65,7 +66,7 @@ local function on_metadata_inventory_put(pos, listname, index, stack, player)
 			end
 		end
 	elseif not nodeinfo.inv():contains_item(listname, api.config.god_item) then
-		local ability = api.abilities_item_index[item_name]
+		local ability = api.ability_by_item(item_name)
 		api.apply_ability(nodeinfo, player_name, ability)
 		if ability.updates_formspec then
 			update_formspec = true
@@ -87,7 +88,8 @@ local function on_metadata_inventory_take(pos, listname, index, stack, player)
 	local nodeinfo = api.nodeinfo(pos)
 	local update_formspec = false
 	if item_name == api.config.god_item then
-		for _,ability in ipairs(api.abilities) do
+		for _,ability_name in ipairs(api.abilities()) do
+			local ability = api.ability(ability_name)
 			if not ability.interface_enabled
 			and api.can_have_ability(nodeinfo, ability.ability)
 			and not api.has_ability(nodeinfo, ability.ability)
@@ -99,7 +101,7 @@ local function on_metadata_inventory_take(pos, listname, index, stack, player)
 			end
 		end
 	elseif not nodeinfo.inv():contains_item(listname, api.config.god_item) then
-		local ability = api.abilities_item_index[item_name]
+		local ability = api.ability_by_item(item_name)
 		-- if not api.has_ability(nodeinfo, ability.ability) then
 			api.unapply_ability(nodeinfo, player_name, ability)
 			if ability.updates_formspec then
@@ -173,7 +175,7 @@ local function after_dig_node(pos, oldnode, oldmeta_table, player)
 	return false
 end
 
-function api.after_place_node(pos, player, itemstack)
+local function after_place_node(pos, player, itemstack)
 	if not (player and player:is_player()) then return end
 	local stackmeta = itemstack:get_meta()
 	local code = stackmeta:get_string('code')
@@ -199,7 +201,8 @@ function api.after_place_node(pos, player, itemstack)
 		local god_ability_applied = false
 		for i,item in ipairs(ability_table) do
 			if item == api.config.god_item then
-				for _,ability in ipairs(api.abilities) do
+				for _,ability_name in ipairs(api.abilities()) do
+					local ability = api.ability(ability_name)
 					if not ability.interface_enabled
 					and api.can_have_ability(nodeinfo, ability.ability)
 					then
@@ -212,18 +215,18 @@ function api.after_place_node(pos, player, itemstack)
 		end
 
 		if not god_ability_applied then
-			for _,ability in ipairs(api.parts[info.part].default_abilities or {}) do
-				api.apply_ability(nodeinfo, player_name, api.abilities_ability_index[ability])
+			for _,ability in ipairs(api.part(info.part).default_abilities or {}) do
+				api.apply_ability(nodeinfo, player_name, api.ability(ability))
 			end
 		end
 
 		meta:set_string('extras', extras)
-		if api.tiers[info.tier].extra_abilities then
+		if api.tier(info.tier).extra_abilities then
 			local extras_enabled_list = string.split(extras,',')
 			for _,ability in ipairs(extras_enabled_list) do
-				for _,ab in ipairs(api.tiers[info.tier].extra_abilities) do
+				for _,ab in ipairs(api.tier(info.tier).extra_abilities) do
 					if ab == ability then
-						api.apply_ability(nodeinfo, player_name, api.abilities_ability_index[ability])
+						api.apply_ability(nodeinfo, player_name, api.ability(ability))
 						break
 					end
 				end
@@ -234,7 +237,7 @@ function api.after_place_node(pos, player, itemstack)
 			if item ~= "" then
 				inv:set_stack('abilities', i, item)
 				if not god_ability_applied then
-					api.apply_ability(nodeinfo, player_name, api.abilities_item_index[item])
+					api.apply_ability(nodeinfo, player_name, api.ability_by_item(item))
 				end
 			end
 		end
@@ -248,19 +251,6 @@ function api.after_place_node(pos, player, itemstack)
 
 end
 
-function api.correct_connection(nodeinfo)
-	if api.is_connective(nodeinfo) then
-		if api.is_connected(nodeinfo) then
-			if not api.is_above_connective(nodeinfo) then
-				api.set_connected(nodeinfo, false)
-			end
-		else
-			if api.is_above_connective(nodeinfo) then
-				api.set_connected(nodeinfo, true)
-			end
-		end
-	end
-end
 
 local function on_destruct(pos)
 	api.correct_connection(api.nodeinfo(vector.subtract(pos, {x=0,y=1,z=0})))
@@ -275,7 +265,7 @@ local function after_construct(nodeinfo)
 	if old_pos_str ~= "" then
 		local old_pos = minetest.string_to_pos(old_pos_str)
 		local diff = vector.subtract(old_pos, pos)
-		if diff.y > api.tiers[nodeinfo.info().tier].max_fall then
+		if diff.y > api.tier(nodeinfo.info().tier).max_fall then
 			api.set_status(nodeinfo, 'broken')
 			meta:set_string('error', S("Ouch: internal damage"))
 		end
@@ -308,7 +298,7 @@ local function on_construct(pos)
 	local meta = nodeinfo.meta()
 	local info = nodeinfo.info()
 	local inv = nodeinfo.inv()
-	local tier_def = api.tiers[info.tier]
+	local tier_def = api.tier(info.tier)
 
 	meta:set_string('code', '')
 	meta:set_string('player_name', '??')
@@ -321,7 +311,7 @@ local function on_construct(pos)
 	inv:set_size('fuel', tier_def.fuel_size or 1)
 	inv:set_size('main', tier_def.inventory_size or 1)
 	local default_abilities = 0
-	for _,ability in ipairs(api.parts[info.part].default_abilities or {}) do
+	for _,ability in ipairs(api.part(info.part).default_abilities or {}) do
 		if api.ability_enabled(ability) then
 			default_abilities = default_abilities + 1
 		end
@@ -351,7 +341,7 @@ api.basic_node = {
 
 	after_destruct = on_destruct,
 	on_construct = on_construct,
-	after_place_node = api.after_place_node,
+	after_place_node = after_place_node,
 	on_receive_fields = api.on_receive_fields,
 
 	on_rightclick = on_rightclick,
@@ -364,47 +354,3 @@ api.basic_node = {
 	on_metadata_inventory_take = on_metadata_inventory_take,
 	on_metadata_inventory_move = on_metadata_inventory_move,
 }
-
-if minetest.get_modpath('screwdriver') then
-	api.basic_node.on_rotate = screwdriver.disallow
-end
-
-
-if minetest.global_exists('tubelib') then
-	api.tubelib_options = {
-		on_pull_item = function(pos, side, player_name)
-			local nodeinfo = api.nodeinfo(pos)
-			if api.has_ability(nodeinfo, 'fill') then
-				local meta = nodeinfo.meta()
-				return tubelib.get_item(meta, 'main')
-			end
-		end,
-		on_push_item = function(pos, side, item, player_name)
-			local nodeinfo = api.nodeinfo(pos)
-			local meta = nodeinfo.meta()
-			if item:get_name() == api.config.fuel_item then
-				return tubelib.put_item(meta, 'fuel', item)
-			elseif api.has_ability(nodeinfo, 'fill') then
-				return tubelib.put_item(meta, 'main', item)
-			end
-			return false
-		end,
-		on_unpull_item = function(pos, side, item, player_name)
-			local nodeinfo = api.nodeinfo(pos)
-			local meta = nodeinfo.meta()
-			if api.has_ability(nodeinfo, 'fill') then
-				return tubelib.put_item(meta, 'main', item)
-			end
-			return false
-		end,
-	}
-	if api.config.repair_item == 'tubelib:repairkit' then
-		api.tubelib_options.on_node_repair = function(pos)
-			local nodeinfo = api.nodeinfo(pos)
-			if nodeinfo.info().status ~= 'broken' then return end
-			api.clear_error(nodeinfo)
-			api.set_status(nodeinfo, 'stopped')
-			return true
-		end
-	end
-end

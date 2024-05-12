@@ -1,4 +1,5 @@
 local api = robot.internal_api
+local S = api.translator
 
 local debug_logs = false
 
@@ -251,9 +252,10 @@ local function run_inner(nodeinfo)
 
 	local commands = {}
 
-	local parts = nodeinfo.parts()
-	for part,_ in pairs(api.parts) do
-		if parts[part] then
+	local parts = api.parts()
+	local node_parts = nodeinfo.parts()
+	for _,part in ipairs(parts) do
+		if node_parts[part] then
 			commands[part] = {}
 		end
 	end
@@ -261,21 +263,22 @@ local function run_inner(nodeinfo)
 
 	local action_call = nil
 
-	for _,ability in ipairs(api.abilities) do
+	for _,ability_name in ipairs(api.abilities()) do
+		local ability = api.ability(ability_name)
 		if ability.action then
 			if not api.any_has_ability(nodeinfo, ability.ability) then
 				local call = function ()
 					error(api.translations.cant.." "..ability.ability..": "..api.translations.noability, 2)
 				end
 				commands[ability.ability] = call
-				for part,_ in pairs(api.parts) do
+				for _,part in ipairs(parts) do
 					if commands[part] then
 						commands[part][ability.ability] = call
 					end
 				end
 			elseif ability.runtime then
 				commands[ability.ability] = runtime_ability(nodeinfo, ability.action)
-				for part,_ in pairs(api.parts) do
+				for _,part in ipairs(parts) do
 					if commands[part] then
 						commands[part][ability.ability] = runtime_ability(nodeinfo, ability.action, part)
 					end
@@ -291,7 +294,7 @@ local function run_inner(nodeinfo)
 						args = {...}
 					}
 				end
-				for part,_ in pairs(api.parts) do
+				for _,part in ipairs(parts) do
 					if commands[part] then
 						commands[part][ability.ability] = function (...)
 							if action_call then
@@ -369,7 +372,7 @@ local function run_inner(nodeinfo)
 		elseif action_call.ability == 'log' then
 			action_func = api.log_action
 		else
-			local ability_obj = api.abilities_ability_index[action_call.ability]
+			local ability_obj = api.ability(action_call.ability)
 			action_func = ability_obj.action
 		end
 

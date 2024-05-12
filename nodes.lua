@@ -1,7 +1,19 @@
 local api = robot.internal_api
 local S = api.translator
 
-
+local function get_tiles(tile_set, state)
+	local ret = {}
+	for i,tile in ipairs(tile_set) do
+		if type(tile) == 'string' then
+			ret[i] = tile
+		elseif tile[state] then
+			ret[i] = tile[state]
+		else
+			ret[i] = tile
+		end
+	end
+	return ret
+end
 
 local function on_timer (pos, dtime)
 	local nodeinfo = api.nodeinfo(pos)
@@ -24,7 +36,7 @@ local function on_timer (pos, dtime)
 	end
 
 	-- If there's no code, stop running but keep the skin
-	-- so builders can use the running face
+	-- so builders can use the running face without using multiple fuel
 	if meta:get_string('code') == "" then
 		local count = 1
 		for _,n in ipairs(nodeinfo.robot_set()) do
@@ -74,402 +86,95 @@ local function on_timer (pos, dtime)
 	return true
 end
 
-local anim_texture = function (image, dur, aspect)
-	return {
-		name = image,
-		animation = {
-			type = "vertical_frames",
-			aspect_w = (aspect and aspect.w) or 8,
-			aspect_h = (aspect and aspect.h) or 8,
-			length = dur,
-		}
-	}
-end
+for _,tier in ipairs(api.tiers()) do
+	local tier_def = api.tier(tier)
+	local tier_props = table.copy(api.basic_node)
 
-local devil_tiles = {
-	top = 'robot_dark_top.png',
-	front = {
-		stopped = 'robot_dark_front.png',
-		running = 'robot_dark_front_running.png',
-		error = 'robot_dark_front_error.png',
-		broken = 'robot_dark_front_broken.png',
-	},
-	front_body = {
-		stopped = 'robot_dark_body_front.png',
-		running = anim_texture('robot_dark_body_front_running.png', 1),
-		error = 'robot_dark_body_front.png',
-		broken = 'robot_dark_body_front_broken.png',
-	},
-	front_legs = {
-		stopped = anim_texture('robot_dark_legs_front.png', 1),
-		running = anim_texture('robot_dark_legs_front_running.png', 0.5),
-		error = anim_texture('robot_dark_legs_front.png', 1),
-		broken = 'robot_dark_legs_front_broken.png',
-	},
-	back = {
-		stopped = 'robot_dark_back.png',
-		running = anim_texture('robot_dark_back_running.png', 1),
-		error = anim_texture('robot_dark_back_error.png', 1),
-		broken = 'robot_dark_back_broken.png',
-	},
-	side = {
-		stopped = 'robot_dark_side.png',
-		running = anim_texture('robot_dark_side_running.png', 1),
-		error = anim_texture('robot_dark_side_error.png', 1),
-		broken = 'robot_dark_side_broken.png',
-	},
-	side_flipped = {
-		stopped = 'robot_dark_side.png^[transform4',
-		running = anim_texture('robot_dark_side_running.png^[transform4', 1),
-		error = anim_texture('robot_dark_side_error.png^[transform4', 1),
-		broken = 'robot_dark_side_broken.png^[transform4',
-	},
-}
-local god_tiles = {
-	top = 'robot_light_top.png',
-	front = {
-		stopped = 'robot_light_front.png',
-		running = 'robot_light_front_running.png',
-		error = 'robot_light_front_error.png',
-		broken = 'robot_light_front_broken.png',
-	},
-	side = {
-		stopped = anim_texture('robot_light_side.png', 2),
-		running = 'robot_light_top.png',
-		error = anim_texture('robot_light_side_error.png', 0.8),
-		broken = anim_texture('robot_light_side_broken.png',  0.8),
-	},
-	body = {
-		stopped = anim_texture('robot_light_body.png', 2,{w=16,h=32}),
-		running = 'robot_light_body_running.png',
-		error = anim_texture('robot_light_body_error.png', 0.8,{w=16,h=32}),
-		broken = anim_texture('robot_light_body_broken.png', 0.8,{w=16,h=32}),
-	},
-	legs = {
-		stopped = anim_texture('robot_light_legs.png', 2,{w=16,h=32}),
-		running = anim_texture('robot_light_legs_running.png', 0.8,{w=16,h=32}),
-		error = anim_texture('robot_light_legs_error.png', 0.8,{w=16,h=32}),
-		broken = anim_texture('robot_light_legs_broken.png', 0.8,{w=16,h=32}),
-	},
-}
-local man_tiles = {
-	top = 'robot_norm_top.png',
-	top_connectable = 'robot_norm_top_connectable.png',
-	bottom = 'robot_norm_bottom.png',
-	bottom_legs = 'robot_norm_legs_bottom.png',
-	front_legs = 'robot_norm_legs_front.png',
-	side_body = 'robot_norm_body_side.png',
-	side = {
-		stopped = 'robot_norm_side.png',
-		running = anim_texture('robot_norm_side_running.png', 1),
-		error = anim_texture('robot_norm_side_error.png', 1),
-		broken = 'robot_norm_side_broken.png'
-	},
-	side_legs = {
-		stopped = 'robot_norm_legs_side.png',
-		running = anim_texture('robot_norm_legs_side_running.png', 1),
-		error = anim_texture('robot_norm_legs_side_error.png', 1),
-		broken = 'robot_norm_legs_side_broken.png'
-	},
-	front_body = {
-		stopped = 'robot_norm_body_front.png',
-		running = anim_texture('robot_norm_body_front_running.png', 1),
-		error = anim_texture('robot_norm_body_front_error.png', 1),
-		broken = 'robot_norm_body_front_broken.png'
-	},
-	back = {
-		stopped = 'robot_norm_back.png',
-		running = 'robot_norm_back_running.png',
-		error = 'robot_norm_back_error.png',
-		broken = 'robot_norm_back_error.png',
-	},
-	front = {
-		stopped = 'robot_norm_front.png',
-		running = 'robot_norm_front_running.png',
-		error = 'robot_norm_front_error.png',
-		broken = 'robot_norm_front_broken.png',
-	}
-}
-
-api.parts = {
-	head = {
-		description = S("Head"),
-		name_postfix = "",
-		tiles = {
-			-- up, down, right, left, back, front
-			man = {
-				man_tiles.top,
-				man_tiles.bottom,
-				man_tiles.side,
-				man_tiles.side,
-				man_tiles.back,
-				man_tiles.front,
-			},
-			devil = {
-				devil_tiles.top,
-				devil_tiles.top,
-				devil_tiles.side,
-				devil_tiles.side_flipped,
-				devil_tiles.back,
-				devil_tiles.front,
-			},
-			god = {
-				god_tiles.side,
-				god_tiles.top,
-				god_tiles.side,
-				god_tiles.side,
-				god_tiles.side,
-				god_tiles.front,
-			}
-		}
-	},
-	body = {
-		description = S("Body"),
-		name_postfix = "_body",
-		tiles = {
-			-- up, down, right, left, back, front
-			man = {
-				man_tiles.top_connectable,
-				man_tiles.top,
-				man_tiles.side_body,
-				man_tiles.side_body,
-				man_tiles.side,
-				man_tiles.front_body,
-			},
-			devil = {
-				devil_tiles.top,
-				devil_tiles.top,
-				devil_tiles.back,
-				devil_tiles.back,
-				devil_tiles.top,
-				devil_tiles.front_body,
-			},
-			god = {
-				god_tiles.body,
-			},
-		},
-		connects_above = {head=true},
-		default_abilities = {"carry","fuel"}
-	},
-	legs = {
-		description = S("Legs"),
-		name_postfix = "_legs",
-		tiles = {
-			-- up, down, right, left, back, front
-			man = {
-				man_tiles.top_connectable,
-				man_tiles.bottom_legs,
-				man_tiles.side_legs,
-				man_tiles.side_legs,
-				man_tiles.front_legs,
-				man_tiles.front_legs,
-			},
-			devil = {
-				devil_tiles.top,
-				devil_tiles.top,
-				devil_tiles.front_legs,
-				devil_tiles.front_legs,
-				devil_tiles.front_legs,
-				devil_tiles.front_legs,
-			},
-			god = {
-				god_tiles.legs,
-			},
-		},
-		connects_above = {head=true,body=true},
-		default_abilities = {"move","turn"}
-	}
-}
-
-api.tiers = {
-	man = {
-		name_prefix = "norm_",
-		delay = 2,
-		ability_slots = 5,
-		inventory_size = 1,
-		form_size = 8,
-		max_fall = 10,
-	},
-	devil = {
-		name_prefix = "dark_",
-		delay = 3,
-		ability_slots = 6,
-		inventory_size = 2,
-		form_size = 9,
-		max_fall = 13,
-		extra_abilities = {
-			"boost",
-		}
-	},
-	god = {
-		name_prefix = "light_",
-		delay = 4,
-		ability_slots = 7,
-		inventory_size = 4,
-		form_size = 10,
-		max_fall = 16,
-		models = {
-			body = 'octohedron.obj',
-			legs = 'dome.obj',
-		},
-		node_boxes = {
-			head = {
-				type = "fixed",
-				fixed = {
-					{-1/4, -1/4, -1/4, 1/4, 1/4, 1/4},
-				},
-			}
-		},
-		extra_props = {
-			paramtype = "light",
-			light_source = 1,
-			collision_box = {
-				type = "fixed",
-				fixed = {
-					{-3/8, -3/8, -3/8, 3/8, 3/8, 3/8},
-				},
-			},
-			selection_box = {
-				type = "fixed",
-				fixed = {
-					{-3/8, -3/8, -3/8, 3/8, 3/8, 3/8},
-				},
-			},
-		},
-		extra_abilities = {
-			"fuel_swap",
-			"boost",
-		}
-	}
-}
-local function get_tiles(tile_set, state)
-	local ret = {}
-	for i,tile in ipairs(tile_set) do
-		if type(tile) == 'string' then
-			ret[i] = tile
-		elseif tile[state] then
-			ret[i] = tile[state]
-		else
-			ret[i] = tile
+	if tier_def.extra_props then
+		for prop, val in pairs(tier_def.extra_props) do
+			tier_props[prop] = val
 		end
 	end
-	return ret
-end
 
-api.index = {
-	tier = {},
-	part = {},
-	status = {},
-}
+	for _,part in ipairs(api.parts()) do
+		local part_def = api.part(part)
+		local part_props = table.copy(tier_props)
 
+		if tier_def.models and tier_def.models[part] then
+			part_props.drawtype = "mesh"
+			part_props.mesh = tier_def.models[part]
+		elseif tier_def.node_boxes and tier_def.node_boxes[part] then
+			part_props.drawtype = "nodebox"
+			part_props.node_box = tier_def.node_boxes[part]
+		end
 
-local function gen_robot_name(tier, part, status)
-	local name = api.robot_name(tier, part, status)
-	api.index.tier[name] = tier
-	api.index.part[name] = part
-	api.index.status[name] = status
-	return name
-end
+		if part_def.description then
+			part_props.description = part_props.description .. " ("..part_def.description..")"
+		end
 
-function api.robot_name(tier, part, status)
-	local ret = "robot:"..api.tiers[tier].name_prefix.."robot"..api.parts[part].name_postfix
-	if status and status ~= 'stopped' then
-		ret = ret .. "_" .. status
+		local stopped_name = api.robot_name(tier, part, 'stopped')
+		local stopped_props = table.copy(part_props)
+		stopped_props.tiles = get_tiles(part_def.tiles[tier], 'stopped')
+		api.record_robot_name(stopped_name, tier, part, 'stopped')
+		minetest.register_node(stopped_name, stopped_props)
+
+		local running_name = api.robot_name(tier, part, 'running')
+		local running_props = table.copy(part_props)
+		running_props.tiles = get_tiles(part_def.tiles[tier], 'running')
+		running_props.groups.not_in_creative_inventory = 1
+		running_props.on_timer = on_timer
+		api.record_robot_name(running_name, tier, part, 'running')
+		minetest.register_node(running_name, running_props)
+
+		local error_name   = api.robot_name(tier, part, 'error'  )
+		local error_props = table.copy(part_props)
+		error_props.tiles = get_tiles(part_def.tiles[tier], 'error')
+		error_props.groups.not_in_creative_inventory = 1
+		api.record_robot_name(error_name  , tier, part, 'error'  )
+		minetest.register_node(error_name, error_props)
+
+		local broken_name  = api.robot_name(tier, part, 'broken' )
+		local broken_props = table.copy(part_props)
+		broken_props.tiles = get_tiles(part_def.tiles[tier], 'broken')
+		broken_props.groups.not_in_creative_inventory = 1
+		broken_props.description = S("Broken Automated Robot")
+		if api.config.repair_item ~= 'tubelib:repairkit' then
+			broken_props.on_punch = function (pos, node, puncher, pointed_thing)
+				if not (puncher and puncher:is_player()) then return end
+
+				local nodeinfo = api.nodeinfo(pos, node)
+				local info = nodeinfo.info()
+				if info.status ~= 'broken' then return end
+
+				local item = puncher:get_wielded_item()
+				if item:is_empty() then return end
+				if item:get_name() ~= api.config.repair_item then return end
+
+				local taken = item:take_item(1)
+				if taken:is_empty() then return end
+
+				api.clear_error(nodeinfo)
+				api.set_status(nodeinfo, 'stopped')
+
+				return puncher:set_wielded_item(item)
+			end
+		end
+		api.record_robot_name(broken_name , tier, part, 'broken' )
+		minetest.register_node(broken_name, broken_props)
+
+		if api.tubelib_options then
+			tubelib.register_node(
+				stopped_name,
+				{
+					stopped_name,
+					error_name,
+					broken_name,
+					running_name
+				},
+				api.tubelib_options
+			)
+		end
+
 	end
-	return ret
-end
-
-function api.robot_def(name)
-	if string.sub(name,1,6) ~= 'robot:' then return end
-	local tier = api.index.tier[name]
-	local part = api.index.part[name]
-	local status = api.index.status[name]
-	if not tier or not part or not status then return end
-	return tier, part, status
-end
-
-for tier,tier_def in pairs(api.tiers) do
-local tier_props = table.copy(api.basic_node)
-
-if tier_def.extra_props then
-	for prop, val in pairs(tier_def.extra_props) do
-		tier_props[prop] = val
-	end
-end
-
-for part,part_def in pairs(api.parts) do
-local part_props = table.copy(tier_props)
-
-if tier_def.models and tier_def.models[part] then
-	part_props.drawtype = "mesh"
-	part_props.mesh = tier_def.models[part]
-elseif tier_def.node_boxes and tier_def.node_boxes[part] then
-	part_props.drawtype = "nodebox"
-	part_props.node_box = tier_def.node_boxes[part]
-end
-
-if part_def.description then
-	part_props.description = part_props.description .. " ("..part_def.description..")"
-end
-
-local stopped_props = table.copy(part_props)
-stopped_props.tiles = get_tiles(part_def.tiles[tier], 'stopped')
-minetest.register_node(gen_robot_name(tier, part, 'stopped'), stopped_props)
-
-
-local running_props = table.copy(part_props)
-running_props.tiles = get_tiles(part_def.tiles[tier], 'running')
-running_props.groups.not_in_creative_inventory = 1
-running_props.on_timer = on_timer
-minetest.register_node(gen_robot_name(tier, part, 'running'), running_props)
-
-
-local error_props = table.copy(part_props)
-error_props.tiles = get_tiles(part_def.tiles[tier], 'error')
-error_props.groups.not_in_creative_inventory = 1
-minetest.register_node(gen_robot_name(tier, part, 'error'), error_props)
-
-
-local broken_props = table.copy(part_props)
-broken_props.tiles = get_tiles(part_def.tiles[tier], 'broken')
-broken_props.groups.not_in_creative_inventory = 1
-broken_props.description = S("Broken Automated Robot")
-if api.config.repair_item ~= 'tubelib:repairkit' then
-	broken_props.on_punch = function (pos, node, puncher, pointed_thing)
-		if not (puncher and puncher:is_player()) then return end
-
-		local nodeinfo = api.nodeinfo(pos, node)
-		local info = nodeinfo.info()
-		if info.status ~= 'broken' then return end
-
-		local item = puncher:get_wielded_item()
-		if item:is_empty() then return end
-		if item:get_name() ~= api.config.repair_item then return end
-
-		local taken = item:take_item(1)
-		if taken:is_empty() then return end
-
-		api.clear_error(nodeinfo)
-		api.set_status(nodeinfo, 'stopped')
-
-		return puncher:set_wielded_item(item)
-	end
-end
-minetest.register_node(gen_robot_name(tier, part, 'broken'), broken_props)
-
-if api.tubelib_options then
-	tubelib.register_node(
-		api.robot_name(tier, part, 'stopped'),
-		{
-			api.robot_name(tier, part, 'stopped'),
-			api.robot_name(tier, part, 'error'),
-			api.robot_name(tier, part, 'broken'),
-			api.robot_name(tier, part, 'running')
-		},
-		api.tubelib_options
-	)
-end
-
-end
 
 end
