@@ -41,7 +41,6 @@ function api.update_formspec(nodeinfo)
 end
 
 function api.on_receive_fields(pos, _formname, fields, sender)
-	minetest.log('error', 'B: '.._formname)
 	local player_name = sender:get_player_name()
 	if fields.quit then
 		api.formspec_data.clear(player_name)
@@ -112,7 +111,6 @@ end
 
 
 function api.global_on_receive_fields(player, formname, fields)
-	minetest.log('error', 'A: '..formname)
 	if formname == 'robot_inventory' then
 		local player_name = player:get_player_name()
 		local pos = api.formspec_data.get(player_name, 'pos')
