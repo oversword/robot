@@ -1,5 +1,5 @@
 local api = robot.internal_api
-local S = api.translator
+-- local S = api.translator
 
 api.config = {}
 

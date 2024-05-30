@@ -1,5 +1,4 @@
 local api = robot.internal_api
-local S = api.translator
 
 api.dofile('api/translator')
 api.dofile('api/helpers')

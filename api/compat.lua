@@ -1,5 +1,5 @@
 local api = robot.internal_api
-local S = api.translator
+-- local S = api.translator
 
 if minetest.get_modpath('screwdriver') then
 	api.basic_node.on_rotate = screwdriver.disallow

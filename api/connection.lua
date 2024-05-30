@@ -1,5 +1,5 @@
 local api = robot.internal_api
-local S = api.translator
+-- local S = api.translator
 
 function api.set_connected(nodeinfo, connected)
 	local meta = nodeinfo.meta()

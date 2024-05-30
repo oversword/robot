@@ -1,5 +1,5 @@
 local api = robot.internal_api
-local S = api.translator
+-- local S = api.translator
 
 function api.stop_timer(nodeinfo)
 	local timer = minetest.get_node_timer(nodeinfo.pos())

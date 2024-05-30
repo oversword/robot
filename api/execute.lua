@@ -1,5 +1,5 @@
 local api = robot.internal_api
-local S = api.translator
+-- local S = api.translator
 
 local debug_logs = false
 
@@ -183,7 +183,7 @@ local function create_sandbox(code, env)
 	end
 
 	-- TODO: settings
-	local maxevents = 999999999--10000--mesecon.setting("luacontroller_maxevents", 10000)
+	local maxevents = 10000--mesecon.setting("luacontroller_maxevents", 10000)
 	return function(...)
 		-- NOTE: This runs within string metatable sandbox, so the setting's been moved out for safety
 		-- Use instruction counter to stop execution

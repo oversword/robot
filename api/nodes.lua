@@ -1,5 +1,5 @@
 local api = robot.internal_api
-local S = api.translator
+-- local S = api.translator
 
 
 local tiers = {}
@@ -169,7 +169,7 @@ function api.add_part(name, part_obj_input)
 		return
 	end
 	local found_part
-	for oart,def in pairs(parts) do
+	for part,def in pairs(parts) do
 		if def.name_postfix == part_obj.name_postfix then
 			found_part = part
 			break
