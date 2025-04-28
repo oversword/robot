@@ -189,7 +189,7 @@ function api.after_place_node(pos, player, itemstack)
 	meta:set_string('code', code)
 	meta:set_int('ignore_errors', ignore_errors)
 	if memory ~= "" then
-		meta:set_string('memory', minetest.deserialize(memory))
+		meta:set_string('memory', memory)
 	end
 	if player and player:is_player() then
 		local inv = nodeinfo.inv()
