@@ -1,4 +1,5 @@
 local api = robot.internal_api
+-- local S = api.translator
 
 function api.stop_timer(nodeinfo)
 	local timer = minetest.get_node_timer(nodeinfo.pos())
@@ -13,7 +14,7 @@ function api.start_timer(nodeinfo)
 		local ns = nodeinfo.robot_set()
 		local delay = 0
 		for _,n in ipairs(ns) do
-			local d = api.tiers[n.info().tier].delay
+			local d = api.tier(n.info().tier).delay
 			if d > delay then
 				delay = d
 			end

@@ -1,4 +1,5 @@
 local api = robot.internal_api
+-- local S = api.translator
 
 local debug_logs = false
 
@@ -182,7 +183,7 @@ local function create_sandbox(code, env)
 	end
 
 	-- TODO: settings
-	local maxevents = 999999999--10000--mesecon.setting("luacontroller_maxevents", 10000)
+	local maxevents = 10000--mesecon.setting("luacontroller_maxevents", 10000)
 	return function(...)
 		-- NOTE: This runs within string metatable sandbox, so the setting's been moved out for safety
 		-- Use instruction counter to stop execution
@@ -218,7 +219,7 @@ local function save_memory(nodeinfo, mem)
 	end
 end
 
-local function runtime_ability(nodeinfo, action)
+local function runtime_ability(nodeinfo, action, part)
 	local ran = false
 	local result
 	return function (...)
@@ -226,7 +227,7 @@ local function runtime_ability(nodeinfo, action)
 			return result
 		end
 		ran = true
-		result = action(nodeinfo, ...)
+		result = action(nodeinfo, part, ...)
 		return result
 	end
 end
@@ -250,16 +251,38 @@ local function run_inner(nodeinfo)
 	-- Create environment
 
 	local commands = {}
+
+	local parts = api.parts()
+	local node_parts = nodeinfo.parts()
+	for _,part in ipairs(parts) do
+		if node_parts[part] then
+			commands[part] = {}
+		end
+	end
+
+
 	local action_call = nil
 
-	for _,ability in ipairs(api.abilities) do
+	for _,ability_name in ipairs(api.abilities()) do
+		local ability = api.ability(ability_name)
 		if ability.action then
 			if not api.any_has_ability(nodeinfo, ability.ability) then
-				commands[ability.ability] = function ()
+				local call = function ()
 					error(api.translations.cant.." "..ability.ability..": "..api.translations.noability, 2)
+				end
+				commands[ability.ability] = call
+				for _,part in ipairs(parts) do
+					if commands[part] then
+						commands[part][ability.ability] = call
+					end
 				end
 			elseif ability.runtime then
 				commands[ability.ability] = runtime_ability(nodeinfo, ability.action)
+				for _,part in ipairs(parts) do
+					if commands[part] then
+						commands[part][ability.ability] = runtime_ability(nodeinfo, ability.action, part)
+					end
+				end
 			else
 				commands[ability.ability] = function (...)
 					if action_call then
@@ -270,6 +293,21 @@ local function run_inner(nodeinfo)
 						ability = ability.ability,
 						args = {...}
 					}
+				end
+				for _,part in ipairs(parts) do
+					if commands[part] then
+						commands[part][ability.ability] = function (...)
+							if action_call then
+								error(api.translations.cant.." "..ability.ability..": "..api.translations.onlyone, 2)
+								return
+							end
+							action_call = {
+								ability = ability.ability,
+								args = {...},
+								part = part,
+							}
+						end
+					end
 				end
 			end
 		end
@@ -334,11 +372,11 @@ local function run_inner(nodeinfo)
 		elseif action_call.ability == 'log' then
 			action_func = api.log_action
 		else
-			local ability_obj = api.abilities_ability_index[action_call.ability]
+			local ability_obj = api.ability(action_call.ability)
 			action_func = ability_obj.action
 		end
 
-		local action_success, newinfo_or_err, fuel_used = pcall(action_func, nodeinfo, unpack(action_call.args))
+		local action_success, newinfo_or_err, fuel_used = pcall(action_func, nodeinfo, action_call.part, unpack(action_call.args))
 
 		if not action_success then
 			return false, api.translations.cant.." "..action_call.ability..": "..newinfo_or_err

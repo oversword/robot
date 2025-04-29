@@ -1,15 +1,8 @@
 local api = robot.internal_api
-
 local S = api.translator
 
-function api.update_formspec(nodeinfo)
-	local meta = nodeinfo.meta()
-	meta:set_string('formspec', api.formspecs.inventory(nodeinfo))
-end
 
-api.formspecs = {}
-
-function api.formspecs.program(code, errmsg, ignore_errors)
+api.add_formspec('program', function (code, errmsg, ignore_errors)
 	return ([[
 		size[12,10]
 		style_type[label,textarea;font=mono]
@@ -26,9 +19,9 @@ function api.formspecs.program(code, errmsg, ignore_errors)
 		ignore_errors and 'true' or 'false',
 		minetest.formspec_escape(S("Reset memory"))
 	)
-end
+end)
 
-function api.formspecs.inventory(nodeinfo)
+api.add_formspec('inventory', function (nodeinfo)
 	local meta = nodeinfo.meta()
 	local extras_enabled_list = string.split(meta:get_string('extras'),',')
 	local extras_enabled = {}
@@ -42,7 +35,7 @@ function api.formspecs.inventory(nodeinfo)
 	local is_connective = api.is_connective(nodeinfo)
 	local has_connection = is_connective and api.is_connected(nodeinfo)
 
-	local tier_def = api.tiers[info.tier]
+	local tier_def = api.tier(info.tier)
 	local exec_button = ''
 	if info.status == 'stopped' then
 		exec_button = minetest.formspec_escape(S("Run"))
@@ -58,17 +51,17 @@ function api.formspecs.inventory(nodeinfo)
 	local fuel_pos = {x=0,y=3}
 	fuel_pos.y = 3 - math.floor((fuel_size-1)/2)
 	local default_abilities = {}
-	for _,ability in ipairs(api.parts[info.part].default_abilities or {}) do
+	for _,ability in ipairs(api.part(info.part).default_abilities or {}) do
 		if api.ability_enabled(ability) then
 			table.insert(default_abilities, ([[
 				item_image[%i,3;1,1;%s]
-			]]):format(3+#default_abilities, api.abilities_ability_index[ability].item))
+			]]):format(3+#default_abilities, api.ability(ability).item))
 		end
 	end
 	local extra_abilities = {}
 	for i,ability in ipairs(tier_def.extra_abilities or {}) do
 		if api.ability_enabled(ability) then
-			local ability_obj = api.abilities_ability_index[ability]
+			local ability_obj = api.ability(ability)
 			table.insert(extra_abilities, ([[
 				item_image_button[%i,2;1,1;%s;ability_switch_%s;]
 				tooltip[ability_switch_%s;%s]
@@ -128,12 +121,13 @@ function api.formspecs.inventory(nodeinfo)
 			table.concat(default_abilities, ""),
 			table.concat(extra_abilities, "")
 		)
-end
+end)
 
-function api.formspecs.ability(nodeinfo)
+api.add_formspec('ability', function (nodeinfo)
 	local info = nodeinfo.info()
 	local entries = {}
-	for _,ability in ipairs(api.abilities) do
+	for _,ability_name in ipairs(api.abilities()) do
+		local ability = api.ability(ability_name)
 		if api.ability_enabled(ability.ability)
 		and not ability.interface_enabled
 		and (not ability.done_by or ability.done_by[info.part]) then
@@ -162,9 +156,9 @@ function api.formspecs.ability(nodeinfo)
 		default.gui_bg_img..
 		default.gui_slots..
 		table.concat(entries, "")
-end
+end)
 
-function api.formspecs.error(error)
+api.add_formspec('error', function (error)
 	return ([[
 		size[12,2]
 		label[0.1,0.3;%s]
@@ -173,9 +167,9 @@ function api.formspecs.error(error)
 		minetest.formspec_escape(error),
 		minetest.formspec_escape(S("Dismiss error"))
 	)
-end
+end)
 
-function api.formspecs.broken()
+api.add_formspec('broken', function ()
 	local item_description = api.config.repair_item
 	local item_def = minetest.registered_nodes[api.config.repair_item] or minetest.registered_items[api.config.repair_item]
 	if item_def then
@@ -191,166 +185,6 @@ function api.formspecs.broken()
 		minetest.formspec_escape(S("The robot is broken")),
 		minetest.formspec_escape(S("Use a").." "..item_description.." "..S("to repair it"))
 	)
-end
-
-local formspec_data = {}
-api.formspec_data = {}
-function api.formspec_data.set(player_name, attrs)
-	formspec_data[player_name] = formspec_data[player_name] or {}
-	for k,v in pairs(attrs) do
-		formspec_data[player_name][k] = v
-	end
-end
-function api.formspec_data.clear(player_name, attr)
-	if not formspec_data[player_name] then return end
-
-	if attr then
-		formspec_data[player_name][attr] = nil
-	else
-		formspec_data[player_name] = nil
-	end
-end
-function api.formspec_data.get(player_name, attr)
-	if not formspec_data[player_name] then return end
-
-	if attr then
-		return formspec_data[player_name][attr]
-	else
-		return formspec_data[player_name]
-	end
-end
-
-function api.on_receive_fields(pos, form_name, fields, sender)
-	local player_name = sender:get_player_name()
-	if fields.quit then
-		api.formspec_data.clear(player_name)
-		return
-	end
-	local nodeinfo = api.nodeinfo(pos)
-	if fields.ability_reference then
-		minetest.show_formspec(player_name, 'robot_abilities', api.formspecs.ability(nodeinfo))
-		return
-	end
-	if fields.program_edit then
-		api.formspec_data.set(player_name, { pos=pos })
-		local meta = nodeinfo.meta()
-		local code = meta:get_string('code')
-		local err = meta:get_string('error')
-		local ignore_errors = meta:get_int('ignore_errors')
-		minetest.show_formspec(player_name, 'robot_program', api.formspecs.program(code, err, ignore_errors == 1))
-		return
-	end
-	if fields.status then
-		local status = nodeinfo.info().status
-		if status == 'stopped' then
-			api.clear_error(nodeinfo)
-			api.set_status(nodeinfo, 'running')
-			minetest.show_formspec(player_name, '', '')
-		elseif status == 'running' then
-			api.set_status(nodeinfo, 'stopped')
-		elseif status == 'error' then
-			api.formspec_data.set(player_name, { pos=pos })
-			minetest.show_formspec(player_name, 'robot_error', api.formspecs.error(nodeinfo.meta():get_string('error')))
-		elseif status == 'broken' then
-			minetest.show_formspec(player_name, 'robot_broken', api.formspecs.broken())
-		end
-		return
-	end
-	local ability_switch
-	for field,val in pairs(fields) do
-		if val and string.sub(field, 1, 15) == 'ability_switch_' then
-			ability_switch = string.sub(field, 16)
-			break
-		end
-	end
-	if ability_switch then
-		local meta = nodeinfo.meta()
-		local extras_enabled_list = string.split(meta:get_string('extras'),',')
-		local extras_enabled_new = {}
-		local found = false
-		for _,def in ipairs(extras_enabled_list) do
-			if def == ability_switch then
-				found = true
-				api.unapply_ability(nodeinfo, player_name, api.abilities_ability_index[def])
-			else
-				table.insert(extras_enabled_new, def)
-			end
-		end
-		if not found then
-			api.apply_ability(nodeinfo, player_name, api.abilities_ability_index[ability_switch])
-			table.insert(extras_enabled_new, ability_switch)
-		end
-		meta:set_string('extras', table.concat(extras_enabled_new, ','))
-
-		api.formspec_data.set(player_name, { pos=pos, psuedo_metadata=true })
-		api.update_formspec(nodeinfo)
-		minetest.show_formspec(player_name, 'robot_inventory', meta:get_string('formspec'))
-		return
-	end
-end
-
-minetest.register_on_player_receive_fields(function(player, formname, fields)
-	if formname == 'robot_inventory' then
-		local player_name = player:get_player_name()
-		local pos = api.formspec_data.get(player_name, 'pos')
-		if not pos then return end
-
-		api.on_receive_fields(pos, formname, fields, player)
-		return
-	end
-	if formname == 'robot_error' then
-		local player_name = player:get_player_name()
-		if fields.quit then
-			api.formspec_data.clear(player_name)
-			return
-		end
-		if fields.dismiss_error then
-			local pos = api.formspec_data.get(player_name, 'pos')
-			if not pos then return end
-
-			local nodeinfo = api.nodeinfo(pos)
-			local meta = nodeinfo.meta()
-			if nodeinfo.info().status == 'error' then
-				meta:set_string('error', '')
-				api.set_status(nodeinfo, 'stopped')
-			end
-
-			api.formspec_data.set(player_name, {psuedo_metadata = true})
-			minetest.show_formspec(player_name, 'robot_inventory', meta:get_string('formspec'))
-		end
-		return
-	end
-
-	if formname ~= 'robot_program' then return end
-
-	local player_name = player:get_player_name()
-	if fields.quit then
-		api.formspec_data.clear(player_name)
-		return
-	end
-
-	local pos = api.formspec_data.get(player_name, 'pos')
-	if not pos then return end
-
-	local nodeinfo = api.nodeinfo(pos)
-	local meta = nodeinfo.meta()
-
-	if fields.ignore_errors then
-		if fields.ignore_errors == 'true' then
-			meta:set_int('ignore_errors', 1)
-		else
-			meta:set_int('ignore_errors', 0)
-		end
-	elseif fields.reset_memory then
-		meta:set_string('memory', minetest.serialize({}))
-	elseif fields.code then
-		meta:set_string('code', fields.code)
-		meta:mark_as_private('code')
-		if nodeinfo.info().status == 'error' then
-			api.set_status(nodeinfo, 'stopped')
-		end
-
-		api.formspec_data.set(player_name, {psuedo_metadata = true})
-		minetest.show_formspec(player_name, 'robot_inventory', meta:get_string('formspec'))
-	end
 end)
+
+minetest.register_on_player_receive_fields(api.global_on_receive_fields)
