@@ -2,14 +2,14 @@ local api = robot.internal_api
 -- local S = api.translator
 
 function api.stop_timer(nodeinfo)
-	local timer = minetest.get_node_timer(nodeinfo.pos())
+	local timer = core.get_node_timer(nodeinfo.pos())
 	if timer:is_started() then
 		timer:stop()
 	end
 end
 
 function api.start_timer(nodeinfo)
-	local timer = minetest.get_node_timer(nodeinfo.pos())
+	local timer = core.get_node_timer(nodeinfo.pos())
 	if not timer:is_started() then
 		local ns = nodeinfo.robot_set()
 		local delay = 0
@@ -38,10 +38,10 @@ function api.move_robot(nodeinfo, new_pos)
 end
 
 function api.can_move_to(pos)
-	local node = minetest.get_node(pos)
+	local node = core.get_node(pos)
 
-	if minetest.registered_nodes[node.name] then
-		return minetest.registered_nodes[node.name].buildable_to or false
+	if core.registered_nodes[node.name] then
+		return core.registered_nodes[node.name].buildable_to or false
 	end
 
 	return false

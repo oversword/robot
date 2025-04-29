@@ -4,8 +4,8 @@ robot.internal_api = {}
 
 local api = robot.internal_api
 
-api.modname = minetest.get_current_modname()
-api.modpath = minetest.get_modpath(api.modname)
+api.modname = core.get_current_modname()
+api.modpath = core.get_modpath(api.modname)
 api.dofile = function (name)
 	return dofile(api.modpath..'/'..name..'.lua')
 end

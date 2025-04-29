@@ -12,12 +12,12 @@ api.add_formspec('program', function (code, errmsg, ignore_errors)
 		checkbox[1,9;ignore_errors;%s;%s]
 		button[9,9;3,1;reset_memory;%s]
 	]]):format(
-		minetest.formspec_escape(errmsg),
-		minetest.formspec_escape(code),
-		minetest.formspec_escape(S("Save Program")),
-		minetest.formspec_escape(S("Ignore errors")),
+		core.formspec_escape(errmsg),
+		core.formspec_escape(code),
+		core.formspec_escape(S("Save Program")),
+		core.formspec_escape(S("Ignore errors")),
 		ignore_errors and 'true' or 'false',
-		minetest.formspec_escape(S("Reset memory"))
+		core.formspec_escape(S("Reset memory"))
 	)
 end)
 
@@ -38,13 +38,13 @@ api.add_formspec('inventory', function (nodeinfo)
 	local tier_def = api.tier(info.tier)
 	local exec_button = ''
 	if info.status == 'stopped' then
-		exec_button = minetest.formspec_escape(S("Run"))
+		exec_button = core.formspec_escape(S("Run"))
 	elseif info.status == 'error' then
-		exec_button = minetest.formspec_escape(S("ERROR"))
+		exec_button = core.formspec_escape(S("ERROR"))
 	elseif info.status == 'running' then
-		exec_button = minetest.formspec_escape(S("Stop"))
+		exec_button = core.formspec_escape(S("Stop"))
 	elseif info.status == 'broken' then
-		exec_button = minetest.formspec_escape(S("Broken"))
+		exec_button = core.formspec_escape(S("Broken"))
 	end
 
 	local size = tier_def.form_size
@@ -69,7 +69,7 @@ api.add_formspec('inventory', function (nodeinfo)
 				2+#extra_abilities,
 				ability_obj.item,
 				ability,ability,
-				minetest.formspec_escape(ability_obj.description)
+				core.formspec_escape(ability_obj.description)
 			)..(extras_enabled[ability] and ("item_image[%i,2;1,1;%s]"):format(2+#extra_abilities, "moretrees:coconut_1") or ""))
 		end
 	end
@@ -101,7 +101,7 @@ api.add_formspec('inventory', function (nodeinfo)
 			fuel_pos.x,fuel_pos.y,
 			api.config.fuel_item,
 			api.config.ability_item,
-			minetest.formspec_escape(S("Ability Reference")),
+			core.formspec_escape(S("Ability Reference")),
 			(size-8)/2,
 			is_connective
 				and ("button[%f,2;6,1;connection;%s]")
@@ -114,7 +114,7 @@ api.add_formspec('inventory', function (nodeinfo)
 					button[%f,2;2,1;status;%s]
 				]]):format(
 					4+#extra_abilities,
-					minetest.formspec_escape(S("Edit Program")),
+					core.formspec_escape(S("Edit Program")),
 					2+#extra_abilities,
 					exec_button
 				),
@@ -123,6 +123,7 @@ api.add_formspec('inventory', function (nodeinfo)
 		)
 end)
 
+local command_wrap_limit = 70
 api.add_formspec('ability', function (nodeinfo)
 	local info = nodeinfo.info()
 	local entries = {}
@@ -140,14 +141,23 @@ api.add_formspec('ability', function (nodeinfo)
 					command = command .. "robot."..ability.ability.."()"
 				end
 			end
+			local command_wraps = #command > command_wrap_limit
+			local wrap_position = command_wraps
+				and (string.find(command, "%W", command_wrap_limit, false))
+				or 1000 -- any number bigger than the max length
 			table.insert(entries, ([[
 				item_image[0,%i;1,1;%s]
 				label[1,%i;%s]
 				label[1,%f;%s]
-			]]):format(
+			]]..(command_wraps and "label[%f,%f;%s]" or "")):format(
 				#entries, ability.item,
-				#entries, minetest.formspec_escape(ability.description),
-				#entries+0.4, command
+				#entries, core.formspec_escape(ability.description),
+				#entries+0.4, core.formspec_escape(command_wraps
+					and string.sub(command, 1, wrap_position)
+					or command
+				),
+				7.5 - ((#command - wrap_position) / 12), #entries+0.65,
+				core.formspec_escape(string.sub(command, wrap_position+1))
 			))
 		end
 	end
@@ -164,14 +174,14 @@ api.add_formspec('error', function (error)
 		label[0.1,0.3;%s]
 		button[4.75,1;3,1;dismiss_error;%s]
 	]]):format(
-		minetest.formspec_escape(error),
-		minetest.formspec_escape(S("Dismiss error"))
+		core.formspec_escape(error),
+		core.formspec_escape(S("Dismiss error"))
 	)
 end)
 
 api.add_formspec('broken', function ()
 	local item_description = api.config.repair_item
-	local item_def = minetest.registered_nodes[api.config.repair_item] or minetest.registered_items[api.config.repair_item]
+	local item_def = core.registered_nodes[api.config.repair_item] or core.registered_items[api.config.repair_item]
 	if item_def then
 		item_description = item_def.description
 	end
@@ -182,9 +192,9 @@ api.add_formspec('broken', function ()
 		label[2,1;%s]
 	]]):format(
 		api.config.repair_item,
-		minetest.formspec_escape(S("The robot is broken")),
-		minetest.formspec_escape(S("Use a").." "..item_description.." "..S("to repair it"))
+		core.formspec_escape(S("The robot is broken")),
+		core.formspec_escape(S("Use a").." "..item_description.." "..S("to repair it"))
 	)
 end)
 
-minetest.register_on_player_receive_fields(api.global_on_receive_fields)
+core.register_on_player_receive_fields(api.global_on_receive_fields)

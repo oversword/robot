@@ -1,12 +1,12 @@
 local api = robot.internal_api
 -- local S = api.translator
 
-if minetest.get_modpath('screwdriver') then
+if core.get_modpath('screwdriver') then
 	api.basic_node.on_rotate = screwdriver.disallow
 end
 
 
-if minetest.global_exists('tubelib') then
+if core.global_exists('tubelib') then
 	api.tubelib_options = {
 		on_pull_item = function(pos, side, player_name)
 			local nodeinfo = api.nodeinfo(pos)

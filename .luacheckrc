@@ -6,6 +6,6 @@ read_globals = {
 	table = {fields = {"copy"}},
 	string = {fields = {"split"}},
 
-	"minetest", "vector", "default", "ItemStack", "dump",
+	"core", "vector", "default", "ItemStack", "dump",
 	"mesecon", "dispenser", "tubelib", "screwdriver"
 }

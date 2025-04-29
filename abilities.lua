@@ -1,7 +1,7 @@
 local api = robot.internal_api
 local S = api.translator
 
-minetest.register_craftitem(api.config.god_item, {
+core.register_craftitem(api.config.god_item, {
 	description = "God Ability",
 	inventory_image = 'robot_god_ability_item.png',
 	groups = {
@@ -67,15 +67,15 @@ end
 robot.add_ability({
 	ability = 'turn',
 	item = function()
-		if minetest.get_modpath('rhotator') then
+		if core.get_modpath('rhotator') then
 			return 'rhotator:screwdriver'
-		elseif minetest.get_modpath('screwdriver') then
+		elseif core.get_modpath('screwdriver') then
 		 return 'screwdriver:screwdriver'
 		end
 		return "default:acacia_bush_leaves"
 	end,
 	description = S("Rotate the robot 90 degrees"),
-	command_example = "robot.turn(<anticlockwise? true|false/nil>)",
+	command_example = "robot.turn(<anticlockwise true | false/nil>)",
 	done_by = { head = true, legs = true },
 	act_on = 'all',
 	depends_on = 'any',
@@ -96,7 +96,7 @@ robot.add_ability({
 robot.add_ability({
 	ability = 'move',
 	item = function ()
-		if minetest.get_modpath('carts') then
+		if core.get_modpath('carts') then
 			return "carts:cart"
 		end
 		return "default:acacia_bush_sapling"
@@ -119,8 +119,8 @@ robot.add_ability({
 				local success, stack, oldstack = mesecon.mvps_push(new_pos, n.direction(), api.config.max_push, owner)
 				if not success then
 					if moved then
-						minetest.check_for_falling(n.pos())
-						minetest.check_for_falling(above)
+						core.check_for_falling(n.pos())
+						core.check_for_falling(above)
 					end
 					if stack == "protected" then
 						error("protected area in the way", 2)
@@ -135,14 +135,14 @@ robot.add_ability({
 			end
 			-- ### Step 4: Let things fall ###
 			if moved then
-				minetest.check_for_falling(ns[#ns].pos())
-				minetest.check_for_falling(above)
+				core.check_for_falling(ns[#ns].pos())
+				core.check_for_falling(above)
 			end
 		else
 			local can_move = true
 			for _,n in ipairs(ns) do
 				local frontpos = n.front()
-				if minetest.is_protected(frontpos, owner) then
+				if core.is_protected(frontpos, owner) then
 					error("protected area in the way", 2)
 					return
 				end
@@ -161,8 +161,8 @@ robot.add_ability({
 				api.move_robot(n, new_pos)
 			end
 			-- ### Step 4: Let things fall ###
-			minetest.check_for_falling(ns[#ns].pos())
-			minetest.check_for_falling(above)
+			core.check_for_falling(ns[#ns].pos())
+			core.check_for_falling(above)
 		end
 	end
 })
@@ -171,7 +171,7 @@ robot.add_ability({
 robot.add_ability({
 	ability = 'climb',
 	item = function ()
-		if minetest.get_modpath('mesecons_pistons') then
+		if core.get_modpath('mesecons_pistons') then
 			return 'mesecons_pistons:piston_normal_off'
 		end
 		return "default:acacia_bush_stem"
@@ -188,7 +188,7 @@ robot.add_ability({
 
 		for _, n in ipairs(ns) do
 			local uppos = vector.add(n.front(), {x=0,y=1,z=0})
-			if minetest.is_protected(uppos, owner) then
+			if core.is_protected(uppos, owner) then
 				error("protected area in the way", 2)
 				return
 			elseif not api.can_move_to(uppos) then
@@ -197,8 +197,8 @@ robot.add_ability({
 			end
 		end
 
-		local under_node = minetest.get_node(lastinfo.front())
-		local under_node_def  = minetest.registered_nodes[under_node.name]
+		local under_node = core.get_node(lastinfo.front())
+		local under_node_def  = core.registered_nodes[under_node.name]
 		if not under_node_def.walkable then
 			error("no support", 2)
 			return
@@ -215,15 +215,15 @@ robot.add_ability({
 robot.add_ability({
 	ability = "look",
 	item = function ()
-		if minetest.get_modpath('mesecons_detector') then
+		if core.get_modpath('mesecons_detector') then
 			return 'mesecons_detector:node_detector_off'
-		elseif minetest.get_modpath('binoculars') then
+		elseif core.get_modpath('binoculars') then
 			return "binoculars:binoculars"
 		end
 		return "default:acacia_leaves"
 	end,
 	description = S("Get the name of the node in front of the robot"),
-	command_example = "node_name = robot.look(<dir 'up'|'front'/nil|'down'|'up-front'|'down-front'>)",
+	command_example = "node_name = robot.look(<dir 'up' | 'front'/nil | 'down' | 'up-front' | 'down-front'>)",
 	done_by = { head = true },
 	act_on = 'first',
 	depends_on = 'self',
@@ -238,7 +238,7 @@ robot.add_ability({
 
 		local dirPos = parseDirectionParam(actorinfo, dir, 'front')
 
-		return minetest.get_node(dirPos.frontpos).name
+		return core.get_node(dirPos.frontpos).name
 	end,
 	runtime = true
 })
@@ -247,9 +247,9 @@ robot.add_ability({
 robot.add_ability({
 	ability = "locate",
 	item = function ()
-		if minetest.get_modpath('orienteering') then
+		if core.get_modpath('orienteering') then
 			return 'orienteering:gps'
-		elseif minetest.get_modpath('map') then
+		elseif core.get_modpath('map') then
 			return 'map:mapping_kit'
 		end
 		return "default:acacia_sapling"
@@ -281,12 +281,12 @@ robot.add_ability({
 -- [[ Place ]]
 robot.add_ability({
 	ability = 'place',
-	disabled = not minetest.get_modpath('dispenser'),
+	disabled = not core.get_modpath('dispenser'),
 	item = 'dispenser:dispenser',
 	act_on = 'first',
 	depends_on = 'self',
 	description = S("Place a block down"),
-	command_example = "robot.place(<dir 'up'|'front'/nil|'down'|'up-front'|'down-front'>)",
+	command_example = "robot.place(<dir 'up' | 'front'/nil | 'down' | 'up-front' | 'down-front'>)",
 	done_by = { head = true, body = true },
 	action = function (nodeinfo, part, dir)
 		local hasability = api.any_has_ability(nodeinfo, 'place')
@@ -311,7 +311,7 @@ robot.add_ability({
 		local meta = actorinfo.meta()
 		local owner = meta:get_string('player_name')
 
-		if minetest.is_protected(frontpos, owner) then
+		if core.is_protected(frontpos, owner) then
 			error("protected area in the way", 2)
 			return
 		end
@@ -339,7 +339,7 @@ robot.add_ability({
 		end
 
 		local item_name = next_stack:get_name()
-		local def = minetest.registered_items[item_name]
+		local def = core.registered_items[item_name]
 		if not (def and def.on_place) then
 			error("item not placable", 2)
 			return
@@ -354,7 +354,7 @@ robot.add_ability({
 		if dir == 'down' then
 			for i, n in ipairs(ns) do
 				local uppos = vector.add(n.pos(), {x=0,y=1,z=0})
-				if minetest.is_protected(uppos, owner) then
+				if core.is_protected(uppos, owner) then
 					error("protected area in the way", 2)
 					return
 				elseif i == 1 and not api.can_move_to(uppos) then
@@ -385,7 +385,7 @@ robot.add_ability({
 			under=frontpos,
 			above=frontpos
 		})
-		minetest.check_for_falling(frontpos)
+		core.check_for_falling(frontpos)
 		if result then
 			inv_info.inv():set_stack('main', next_index, result)
 		end
@@ -396,9 +396,9 @@ robot.add_ability({
 -- [[ Use ]]
 robot.add_ability({
 	ability = 'use',
-	disabled = not minetest.get_modpath('dispenser'),
+	disabled = not core.get_modpath('dispenser'),
 	item = function ()
-		if minetest.get_modpath('bones') then
+		if core.get_modpath('bones') then
 			return "bones:bones"
 		end
 		return "default:acacia_tree"
@@ -406,7 +406,7 @@ robot.add_ability({
 	act_on = 'first',
 	depends_on = 'self',
 	description = S("Use an item (not a tool)"),
-	command_example = "robot.use(<dir 'up'|'front'/nil|'down'|'up-front'|'down-front'>)",
+	command_example = "robot.use(<dir 'up' | 'front'/nil | 'down' | 'up-front' | 'down-front'>)",
 	done_by = { head = true, body = true },
 	action = function (nodeinfo, part, dir)
 		local hasability = api.any_has_ability(nodeinfo, 'use')
@@ -441,7 +441,7 @@ robot.add_ability({
 		end
 
 		local item_name = next_stack:get_name()
-		local def = minetest.registered_items[item_name]
+		local def = core.registered_items[item_name]
 		if not (def and def.on_use) then
 			error("item not usable", 2)
 			return
@@ -471,9 +471,9 @@ robot.add_ability({
 -- [[ Switch ]]
 robot.add_ability({
 	ability = 'switch',
-	disabled = not minetest.get_modpath('tubelib'),
+	disabled = not core.get_modpath('tubelib'),
 	item = function ()
-		if minetest.get_modpath('tubelib') then
+		if core.get_modpath('tubelib') then
 			return 'tubelib:button'
 		end
 		return "default:acacia_wood"
@@ -481,9 +481,9 @@ robot.add_ability({
 	act_on = 'first',
 	depends_on = 'self',
 	description = S("Switch a tubelib machine on and off"),
-	command_example = "robot.switch(<dir 'up'|'front'/nil|'down'|'up-front'|'down-front'>)",
+	command_example = "robot.switch(<mode 'on' | 'off' | 'toggle'/nil>, <dir 'up' | 'front'/nil | 'down' | 'up-front' | 'down-front'>)",
 	done_by = { head = true, body = true },
-	action = function (nodeinfo, part, dir)
+	action = function (nodeinfo, part, mode, dir)
 		local hasability = api.any_has_ability(nodeinfo, 'switch')
 		if not hasability then return end
 
@@ -494,10 +494,14 @@ robot.add_ability({
 
 		local dirPos = parseDirectionParam(actorinfo, dir, 'front')
 
-		local tube_meta = minetest.get_meta(dirPos.frontpos)
+		local tube_meta = core.get_meta(dirPos.frontpos)
 
 		local state = tube_meta:get_int("tubelib_state")
+		core.log("error", dump(state))
 		if not state then return end
+		
+		local on_or_off = ((mode == "on" or mode == "off") and mode)
+			or (state == tubelib.STOPPED and "on" or "off")
 
 		local number = tubelib.get_node_number(dirPos.frontpos)
 		if not number or number == "" then return end
@@ -505,16 +509,16 @@ robot.add_ability({
 		local meta = actorinfo.meta()
 		local owner = meta:get_string('player_name')
 
-		tubelib.send_message(number, owner, nil, state == tubelib.STOPPED and "on" or "off", nil)
+		tubelib.send_message(number, owner, nil, on_or_off, nil)
 	end
 })
 
 -- [[ Push ]]
 robot.add_ability({
 	ability = 'push',
-	disabled = not minetest.get_modpath('mesecons_mvps'),
+	disabled = not core.get_modpath('mesecons_mvps'),
 	item = function ()
-		if minetest.get_modpath('mesecons_movestones') then
+		if core.get_modpath('mesecons_movestones') then
 			return "mesecons_movestones:movestone"
 		end
 		return "default:apple"
@@ -529,9 +533,9 @@ robot.add_ability({
 robot.add_ability({
 	ability = 'carry',
 	item = function ()
-		if minetest.get_modpath('unified_inventory') then
+		if core.get_modpath('unified_inventory') then
 			return 'unified_inventory:bag_large'
-		elseif minetest.get_modpath('default') then
+		elseif core.get_modpath('default') then
 			return 'default:chest'
 		end
 		return "default:aspen_leaves"
@@ -564,7 +568,7 @@ robot.add_ability({
 			local fuel_list = inv:get_list('fuel')
 			for i,stack in ipairs(fuel_list) do
 				if i > new_fuel_size then
-					minetest.add_item(vector.add(nodeinfo.pos(), {x=0,y=0.5,z=0}), stack)
+					core.add_item(vector.add(nodeinfo.pos(), {x=0,y=0.5,z=0}), stack)
 				end
 			end
 			inv:set_size('fuel', new_fuel_size)
@@ -573,7 +577,7 @@ robot.add_ability({
 		local list = inv:get_list('main')
 		for i,stack in ipairs(list) do
 			if i > new_size then
-				minetest.add_item(vector.add(nodeinfo.pos(), {x=0,y=0.5,z=0}), stack)
+				core.add_item(vector.add(nodeinfo.pos(), {x=0,y=0.5,z=0}), stack)
 			end
 		end
 
@@ -585,9 +589,9 @@ robot.add_ability({
 robot.add_ability({
 	ability = 'fuel',
 	item = function ()
-		if minetest.get_modpath('unified_inventory') then
+		if core.get_modpath('unified_inventory') then
 			return 'unified_inventory:bag_small'
-		elseif minetest.get_modpath('default') then
+		elseif core.get_modpath('default') then
 			return 'default:furnace'
 		end
 		return "default:aspen_sapling"
@@ -609,7 +613,7 @@ robot.add_ability({
 		local new_size = inv:get_size('fuel')-3
 		for i,stack in ipairs(list) do
 			if i > new_size then
-				minetest.add_item(vector.add(nodeinfo.pos(), {x=0,y=0.5,z=0}), stack)
+				core.add_item(vector.add(nodeinfo.pos(), {x=0,y=0.5,z=0}), stack)
 			end
 		end
 
@@ -620,9 +624,9 @@ robot.add_ability({
 -- [[ Fill ]]
 robot.add_ability({
 	ability = 'fill',
-	disabled = not minetest.get_modpath('tubelib'),
+	disabled = not core.get_modpath('tubelib'),
 	item = function ()
-		if minetest.get_modpath('tubelib') then
+		if core.get_modpath('tubelib') then
 			return 'tubelib:tubeS'
 		end
 		return "default:aspen_tree"
@@ -637,9 +641,9 @@ robot.add_ability({
 robot.add_ability({
 	ability = 'speed',
 	item = function ()
-		if minetest.get_modpath('terumet') then
+		if core.get_modpath('terumet') then
 			return 'terumet:item_upg_speed_up'
-		elseif minetest.get_modpath('carts') then
+		elseif core.get_modpath('carts') then
 			return 'carts:powerrail'
 		end
 		return "default:aspen_wood"
@@ -664,7 +668,7 @@ robot.add_ability({
 robot.add_ability({
 	ability = 'connectivity',
 	item = function ()
-		if minetest.get_modpath('digistuff') then
+		if core.get_modpath('digistuff') then
 			return "digistuff:insulated_straight"
 		end
 		return "default:obsidian_glass"
@@ -687,7 +691,7 @@ robot.add_ability({
 	interface_enabled = true,
 	ability = "fuel_swap",
 	item = function ()
-		if minetest.get_modpath('replacer') then
+		if core.get_modpath('replacer') then
 			return "replacer:replacer"
 		end
 		return "default:blueberries"
@@ -711,7 +715,7 @@ robot.add_ability({
 		local new_size = inv:get_size('main')-size_change
 		for i,stack in ipairs(list) do
 			if i > new_size then
-				minetest.add_item(vector.add(nodeinfo.pos(), {x=0,y=0.5,z=0}), stack)
+				core.add_item(vector.add(nodeinfo.pos(), {x=0,y=0.5,z=0}), stack)
 			end
 		end
 		inv:set_size('main', new_size)
@@ -730,7 +734,7 @@ robot.add_ability({
 		local new_size = inv:get_size('fuel')-size_change
 		for i,stack in ipairs(list) do
 			if i > new_size then
-				minetest.add_item(vector.add(nodeinfo.pos(), {x=0,y=0.5,z=0}), stack)
+				core.add_item(vector.add(nodeinfo.pos(), {x=0,y=0.5,z=0}), stack)
 			end
 		end
 		inv:set_size('fuel', new_size)
@@ -742,7 +746,7 @@ robot.add_ability({
 	interface_enabled = true,
 	ability = "boost",
 	item = function ()
-		if minetest.get_modpath('orienteering') then
+		if core.get_modpath('orienteering') then
 			return "orienteering:speedometer"
 		end
 		return "default:blueberry_bush_leaves"

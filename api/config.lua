@@ -6,14 +6,14 @@ api.config = {}
 api.config.god_item = 'robot:god_ability'
 
 api.config.fuel_item = 'default:coal_lump'
-if minetest.get_modpath('tubelib_addons1') then
+if core.get_modpath('tubelib_addons1') then
 	api.config.fuel_item = 'tubelib_addons1:biofuel'
 end
 
 api.config.ability_item = 'default:skeleton_key'
 
 api.config.repair_item = 'default:mese_crystal'
-if minetest.get_modpath('tubelib') then
+if core.get_modpath('tubelib') then
 	api.config.repair_item = 'tubelib:repairkit'
 end
 

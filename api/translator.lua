@@ -1,6 +1,6 @@
 local api = robot.internal_api
 
-api.translator = minetest.get_translator(api.modname)
+api.translator = core.get_translator(api.modname)
 local S = api.translator
 
 api.translations = {

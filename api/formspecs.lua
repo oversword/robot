@@ -48,7 +48,7 @@ function api.on_receive_fields(pos, _formname, fields, sender)
 	end
 	local nodeinfo = api.nodeinfo(pos)
 	if fields.ability_reference then
-		minetest.show_formspec(player_name, 'robot_abilities', formspecs.ability(nodeinfo))
+		core.show_formspec(player_name, 'robot_abilities', formspecs.ability(nodeinfo))
 		return
 	end
 	if fields.program_edit then
@@ -57,7 +57,7 @@ function api.on_receive_fields(pos, _formname, fields, sender)
 		local code = meta:get_string('code')
 		local err = meta:get_string('error')
 		local ignore_errors = meta:get_int('ignore_errors')
-		minetest.show_formspec(player_name, 'robot_program', formspecs.program(code, err, ignore_errors == 1))
+		core.show_formspec(player_name, 'robot_program', formspecs.program(code, err, ignore_errors == 1))
 		return
 	end
 	if fields.status then
@@ -65,14 +65,14 @@ function api.on_receive_fields(pos, _formname, fields, sender)
 		if status == 'stopped' then
 			api.clear_error(nodeinfo)
 			api.set_status(nodeinfo, 'running')
-			minetest.show_formspec(player_name, '', '')
+			core.show_formspec(player_name, '', '')
 		elseif status == 'running' then
 			api.set_status(nodeinfo, 'stopped')
 		elseif status == 'error' then
 			api.formspec_data.set(player_name, { pos=pos })
-			minetest.show_formspec(player_name, 'robot_error', formspecs.error(nodeinfo.meta():get_string('error')))
+			core.show_formspec(player_name, 'robot_error', formspecs.error(nodeinfo.meta():get_string('error')))
 		elseif status == 'broken' then
-			minetest.show_formspec(player_name, 'robot_broken', formspecs.broken())
+			core.show_formspec(player_name, 'robot_broken', formspecs.broken())
 		end
 		return
 	end
@@ -104,7 +104,7 @@ function api.on_receive_fields(pos, _formname, fields, sender)
 
 		api.formspec_data.set(player_name, { pos=pos, psuedo_metadata=true })
 		api.update_formspec(nodeinfo)
-		minetest.show_formspec(player_name, 'robot_inventory', meta:get_string('formspec'))
+		core.show_formspec(player_name, 'robot_inventory', meta:get_string('formspec'))
 		return
 	end
 end
@@ -137,7 +137,7 @@ function api.global_on_receive_fields(player, formname, fields)
 			end
 
 			api.formspec_data.set(player_name, {psuedo_metadata = true})
-			minetest.show_formspec(player_name, 'robot_inventory', meta:get_string('formspec'))
+			core.show_formspec(player_name, 'robot_inventory', meta:get_string('formspec'))
 		end
 		return
 	end
@@ -163,7 +163,7 @@ function api.global_on_receive_fields(player, formname, fields)
 			meta:set_int('ignore_errors', 0)
 		end
 	elseif fields.reset_memory then
-		meta:set_string('memory', minetest.serialize({}))
+		meta:set_string('memory', core.serialize({}))
 	elseif fields.code then
 		meta:set_string('code', fields.code)
 		meta:mark_as_private('code')
@@ -172,6 +172,6 @@ function api.global_on_receive_fields(player, formname, fields)
 		end
 
 		api.formspec_data.set(player_name, {psuedo_metadata = true})
-		minetest.show_formspec(player_name, 'robot_inventory', meta:get_string('formspec'))
+		core.show_formspec(player_name, 'robot_inventory', meta:get_string('formspec'))
 	end
 end

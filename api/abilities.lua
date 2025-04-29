@@ -41,7 +41,7 @@ function robot.add_ability(ability_obj)
 		ability_obj.item = item
 	end
 	if not ability_obj.item then
-		minetest.log("warning", ("[robot] ability %s will not be usable until an item is set for it"):format(ability_obj.ability))
+		core.log("warning", ("[robot] ability %s will not be usable until an item is set for it"):format(ability_obj.ability))
 	end
 
 	abilities_by_item[ability_obj.item] = ability_obj
@@ -147,7 +147,7 @@ end
 function api.apply_ability(nodeinfo, player_name, ability)
 	if ability.modifier then
 		if not ability.un_modifier then
-			minetest.log("error", "[robot] Ability modifier will not run unless it has an un-modfier method.")
+			core.log("error", "[robot] Ability modifier will not run unless it has an un-modfier method.")
 			return
 		end
 		ability.modifier(nodeinfo, player_name)
@@ -168,6 +168,6 @@ end
 function api.log_action (nodeinfo,_part,...)
 	local meta = nodeinfo.meta()
 	local owner = meta:get_string('player_name')
-	minetest.chat_send_player(owner, "[robot] LOG: "..dump({...}))
+	core.chat_send_player(owner, "[robot] LOG: "..dump({...}))
 	return nil, 0
 end

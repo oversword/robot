@@ -75,7 +75,7 @@ local function on_timer (pos, dtime)
 	end
 
 	if not ok then
-		-- minetest.log("error",  errmsg)
+		-- core.log("error",  errmsg)
 		return not api.set_error(nodeinfo, errmsg)
 	end
 
@@ -116,7 +116,7 @@ for _,tier in ipairs(api.tiers()) do
 		local stopped_props = table.copy(part_props)
 		stopped_props.tiles = get_tiles(part_def.tiles[tier], 'stopped')
 		api.record_robot_name(stopped_name, tier, part, 'stopped')
-		minetest.register_node(stopped_name, stopped_props)
+		core.register_node(stopped_name, stopped_props)
 
 		local running_name = api.robot_name(tier, part, 'running')
 		local running_props = table.copy(part_props)
@@ -124,14 +124,14 @@ for _,tier in ipairs(api.tiers()) do
 		running_props.groups.not_in_creative_inventory = 1
 		running_props.on_timer = on_timer
 		api.record_robot_name(running_name, tier, part, 'running')
-		minetest.register_node(running_name, running_props)
+		core.register_node(running_name, running_props)
 
 		local error_name   = api.robot_name(tier, part, 'error'  )
 		local error_props = table.copy(part_props)
 		error_props.tiles = get_tiles(part_def.tiles[tier], 'error')
 		error_props.groups.not_in_creative_inventory = 1
 		api.record_robot_name(error_name  , tier, part, 'error'  )
-		minetest.register_node(error_name, error_props)
+		core.register_node(error_name, error_props)
 
 		local broken_name  = api.robot_name(tier, part, 'broken' )
 		local broken_props = table.copy(part_props)
@@ -160,7 +160,7 @@ for _,tier in ipairs(api.tiers()) do
 			end
 		end
 		api.record_robot_name(broken_name , tier, part, 'broken' )
-		minetest.register_node(broken_name, broken_props)
+		core.register_node(broken_name, broken_props)
 
 		if api.tubelib_options then
 			tubelib.register_node(

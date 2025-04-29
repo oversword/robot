@@ -199,12 +199,12 @@ end
 
 local function load_memory(nodeinfo)
 	local meta = nodeinfo.meta()
-	return minetest.deserialize(meta:get_string("memory"), true) or {}
+	return core.deserialize(meta:get_string("memory"), true) or {}
 end
 
 
 local function save_memory(nodeinfo, mem)
-	local memstring = minetest.serialize(remove_functions(mem))
+	local memstring = core.serialize(remove_functions(mem))
 	-- TODO: settings
 	local memsize_max = 100000--mesecon.setting("luacontroller_memsize", 100000)
 
@@ -360,7 +360,7 @@ local function run_inner(nodeinfo)
 	if debug_logs then
 		if #logs then
 			for i,l in ipairs(logs) do
-				minetest.log("error", dump(l))
+				core.log("error", dump(l))
 			end
 		end
 	end

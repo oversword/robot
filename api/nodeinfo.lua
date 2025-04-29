@@ -22,7 +22,7 @@ api.nodeinfo = function(pos)
 			end
 		end
 		if changes then
-			minetest.swap_node(nodeapi.pos(), node)
+			core.swap_node(nodeapi.pos(), node)
 			cache_vers.node = (cache_vers.node or -1) + 1
 		end
 	end
@@ -30,15 +30,15 @@ api.nodeinfo = function(pos)
 		local node = nodeapi.node()
 		local meta = nodeapi.meta():to_table()
 
-		minetest.set_node(new_pos, node)
+		core.set_node(new_pos, node)
 		cache.pos = new_pos
 		cache_vers.pos = cache_vers.pos+1
 		nodeapi.meta():from_table(meta)
 
-		minetest.remove_node(pos)
-		minetest.after(0.01, api.stop_timer, api.nodeinfo(pos))
+		core.remove_node(pos)
+		core.after(0.01, api.stop_timer, api.nodeinfo(pos))
 		-- TODO: any sound design at all
-		-- minetest.sound_play("movestone", { pos = pos, max_hear_distance = 20, gain = 0.5 }, true)
+		-- core.sound_play("movestone", { pos = pos, max_hear_distance = 20, gain = 0.5 }, true)
 	end
 	for name, def in pairs(nodeinfos) do
 		nodeapi[name] = function (...)
