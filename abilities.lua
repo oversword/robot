@@ -278,6 +278,14 @@ robot.add_ability({
 	runtime = true
 })
 
+local function is_default_method(obj, key)
+	local method = obj[key]
+	return (key == 'on_place' and method == core.item_place)
+		or core.noneitemdef_default[key] == method
+		or core.tooldef_default[key] == method
+		or core.craftitemdef_default[key] == method
+		or core.nodedef_default[key] == method
+end
 -- [[ Place ]]
 robot.add_ability({
 	ability = 'place',
@@ -317,31 +325,45 @@ robot.add_ability({
 		end
 
 		local ns = nodeinfo.robot_set()
+		local ordered_set = {}
+		for _,n in ipairs(ns) do
+			if n.info().part == part then
+				table.insert(ordered_set, 1, n)
+			else
+				table.insert(ordered_set, n)
+			end
+		end
 
 		local inv_info
 		local next_index
 		local next_stack
-		for _,n in ipairs(ns) do
+		local item_name
+		local def
+		local empty = true
+		for _,n in ipairs(ordered_set) do
 			local list = n.inv():get_list('main')
 			for index, stack in ipairs(list) do
 				if not stack:is_empty() then
 					next_index = index
-					inv_info = n
 					next_stack = stack
-					break
+					item_name = next_stack:get_name()
+					def = core.registered_items[item_name]
+					empty = false
+					if def and def.on_place and (def.type == 'node' or not is_default_method(def, 'on_place')) then
+						inv_info = n
+						break
+					end
 				end
 			end
 			if inv_info then break end
 		end
-		if not inv_info then
+		if empty then
 			error("inventory empty", 2)
 			return
 		end
 
-		local item_name = next_stack:get_name()
-		local def = core.registered_items[item_name]
-		if not (def and def.on_place) then
-			error("item not placable", 2)
+		if not inv_info then
+			error("no placable item", 2)
 			return
 		end
 		local player_opts = {
@@ -419,31 +441,45 @@ robot.add_ability({
 
 		local dirPos = parseDirectionParam(actorinfo, dir, 'front')
 
+		local ordered_set = {}
+		for _,n in ipairs(nodeinfo.robot_set()) do
+			if n.info().part == part then
+				table.insert(ordered_set, 1, n)
+			else
+				table.insert(ordered_set, n)
+			end
+		end
+
 		local inv_info
 		local next_stack
 		local next_index
-		for _,n in ipairs(nodeinfo.robot_set()) do
+		local item_name
+		local def
+		local empty = true
+		for _,n in ipairs(ordered_set) do
 			local node_inv = n.inv()
 			local list = node_inv:get_list('main')
 			for index,stack in ipairs(list) do
 				if not stack:is_empty() then
 					next_stack = stack
 					next_index = index
-					inv_info = n
-					break
+					item_name = next_stack:get_name()
+					def = core.registered_items[item_name]
+					empty = false
+					if def and def.on_use then
+						inv_info = n
+						break
+					end
 				end
 			end
 			if inv_info then break end
 		end
-		if not next_stack then
+		if empty then
 			error("inventory empty", 2)
 			return
 		end
-
-		local item_name = next_stack:get_name()
-		local def = core.registered_items[item_name]
-		if not (def and def.on_use) then
-			error("item not usable", 2)
+		if not inv_info then
+			error("no usable item", 2)
 			return
 		end
 		local player = dispenser.actions.fake_player(next_stack, {
@@ -497,7 +533,6 @@ robot.add_ability({
 		local tube_meta = core.get_meta(dirPos.frontpos)
 
 		local state = tube_meta:get_int("tubelib_state")
-		core.log("error", dump(state))
 		if not state then return end
 		
 		local on_or_off = ((mode == "on" or mode == "off") and mode)
