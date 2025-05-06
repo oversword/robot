@@ -534,7 +534,7 @@ robot.add_ability({
 
 		local state = tube_meta:get_int("tubelib_state")
 		if not state then return end
-		
+
 		local on_or_off = ((mode == "on" or mode == "off") and mode)
 			or (state == tubelib.STOPPED and "on" or "off")
 
