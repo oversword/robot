@@ -219,16 +219,14 @@ local function save_memory(nodeinfo, mem)
 	end
 end
 
-local function runtime_ability(nodeinfo, action, part)
-	local ran = false
-	local result
+local function runtime_ability(nodeinfo, ability, part)
+	local cached_results = {}
 	return function (...)
-		if ran then
-			return result
+		local unique = ability.runtime_unique and ability.runtime_unique(part or 'main', ...) or part or 'main'
+		if cached_results[unique] == nil then
+			cached_results[unique] = ability.action(nodeinfo, part or 'main', ...)
 		end
-		ran = true
-		result = action(nodeinfo, part, ...)
-		return result
+		return cached_results[unique]
 	end
 end
 
@@ -277,10 +275,10 @@ local function run_inner(nodeinfo)
 					end
 				end
 			elseif ability.runtime then
-				commands[ability.ability] = runtime_ability(nodeinfo, ability.action)
+				commands[ability.ability] = runtime_ability(nodeinfo, ability)
 				for _,part in ipairs(parts) do
 					if commands[part] then
-						commands[part][ability.ability] = runtime_ability(nodeinfo, ability.action, part)
+						commands[part][ability.ability] = runtime_ability(nodeinfo, ability, part)
 					end
 				end
 			else
