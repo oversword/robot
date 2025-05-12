@@ -240,6 +240,9 @@ robot.add_ability({
 
 		return core.get_node(dirPos.frontpos).name
 	end,
+	runtime_unique = function (part, dir)
+		return part..dir
+	end,
 	runtime = true
 })
 
@@ -274,6 +277,33 @@ robot.add_ability({
 			y = pos.y,
 			z = pos.z,
 		}
+	end,
+	runtime = true
+})
+
+-- [[ Speak ]]
+robot.add_ability({
+	ability = "speak",
+	item = function ()
+		if core.get_modpath('homedecor') then
+			return 'homedecor:speaker_driver'
+		end
+		return "default:pine_sapling"
+	end,
+	act_on = 'last',
+	depends_on = 'any',
+	description = S("Send chat messages to the owner"),
+	command_example = "robot.speak('Hello!')",
+	done_by = { head = true },
+	action = function (nodeinfo, part, message)
+		local hasability = api.any_has_ability(nodeinfo, 'speak')
+		if not hasability then return end
+
+		local meta = nodeinfo.meta()
+		local owner = meta:get_string('player_name')
+		core.chat_send_player(owner, "[robot] "..message)
+
+		return nil
 	end,
 	runtime = true
 })
